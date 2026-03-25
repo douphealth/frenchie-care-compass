@@ -226,7 +226,8 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
       }
 
       // Bullet
-      doc.setFillColor(isWarning ? ...COLORS.gold : ...COLORS.terracotta);
+      const bulletColor = isWarning ? COLORS.gold : COLORS.terracotta;
+      doc.setFillColor(bulletColor[0], bulletColor[1], bulletColor[2]);
       doc.circle(mx + 5, y + 5, 1.2, 'F');
 
       doc.setFontSize(9);
