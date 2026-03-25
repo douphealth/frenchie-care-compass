@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
+import { Check } from 'lucide-react';
 
 type Option = { value: string; label: string; description: string };
 
@@ -19,6 +20,11 @@ type Props = {
   onSliderChange?: (v: number) => void;
 };
 
+const bodyConditionLabels: Record<number, string> = {
+  1: 'Emaciated', 2: 'Very Thin', 3: 'Thin', 4: 'Slightly Lean',
+  5: 'Ideal', 6: 'Slightly Heavy', 7: 'Heavy', 8: 'Obese', 9: 'Severely Obese',
+};
+
 const QuizStep = ({
   question, subtitle, options, type, selected, onSelect,
   hasSlider, sliderLabel, sliderMin = 1, sliderMax = 9, sliderValue = 5, onSliderChange,
@@ -35,43 +41,73 @@ const QuizStep = ({
   const isSelected = (value: string) =>
     type === 'single' ? selected === value : (Array.isArray(selected) && selected.includes(value));
 
-  const bodyConditionLabels: Record<number, string> = {
-    1: 'Emaciated', 2: 'Very Thin', 3: 'Thin', 4: 'Slightly Lean',
-    5: 'Ideal', 6: 'Slightly Heavy', 7: 'Heavy', 8: 'Obese', 9: 'Severely Obese',
+  // Split emoji from label text
+  const getEmoji = (label: string) => {
+    const parts = label.split(' ');
+    return { emoji: parts[0], text: parts.slice(1).join(' ') };
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-      <div className="text-center space-y-2">
-        <h2 className="text-xl font-bold text-foreground">{question}</h2>
-        <p className="text-sm text-muted-foreground">{subtitle}</p>
-      </div>
+    <div className="space-y-6">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        className="text-center space-y-2"
+      >
+        <h2 className="text-xl md:text-2xl font-bold text-foreground font-display">{question}</h2>
+        <p className="text-sm text-muted-foreground max-w-sm mx-auto">{subtitle}</p>
+      </motion.div>
 
       <div className="grid gap-3">
-        {options.map((opt) => (
-          <button
-            key={opt.value}
-            onClick={() => handleClick(opt.value)}
-            className={cn(
-              'flex items-center gap-3 p-4 rounded-xl border-2 text-left transition-all',
-              'hover:border-accent hover:shadow-md',
-              isSelected(opt.value)
-                ? 'border-primary bg-primary/10 shadow-md'
-                : 'border-border bg-card'
-            )}
-          >
-            <span className="text-2xl">{opt.label.split(' ')[0]}</span>
-            <div>
-              <div className="font-semibold text-foreground">{opt.label.split(' ').slice(1).join(' ')}</div>
-              <div className="text-xs text-muted-foreground">{opt.description}</div>
-            </div>
-          </button>
-        ))}
+        {options.map((opt, i) => {
+          const { emoji, text } = getEmoji(opt.label);
+          const active = isSelected(opt.value);
+          return (
+            <motion.button
+              key={opt.value}
+              initial={{ opacity: 0, x: 30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.35, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] }}
+              whileHover={{ scale: 1.02, y: -1 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => handleClick(opt.value)}
+              className={cn(
+                'relative flex items-center gap-4 p-4 md:p-5 rounded-2xl border-2 text-left transition-all duration-200',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                active
+                  ? 'border-primary bg-primary/8 shadow-lg shadow-primary/10'
+                  : 'border-border bg-card hover:border-secondary/40 hover:shadow-md'
+              )}
+            >
+              <span className="text-3xl md:text-4xl shrink-0 w-12 h-12 flex items-center justify-center rounded-xl bg-muted/50">
+                {emoji}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-foreground text-sm md:text-base">{text}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{opt.description}</div>
+              </div>
+              <motion.div
+                initial={false}
+                animate={{ scale: active ? 1 : 0, opacity: active ? 1 : 0 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                className="shrink-0 w-6 h-6 rounded-full bg-primary flex items-center justify-center"
+              >
+                <Check className="w-3.5 h-3.5 text-primary-foreground" />
+              </motion.div>
+            </motion.button>
+          );
+        })}
       </div>
 
       {hasSlider && (
-        <div className="space-y-3 pt-2">
-          <label className="text-sm font-semibold text-foreground">{sliderLabel}</label>
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.3 }}
+          className="glass-card rounded-2xl p-5 space-y-4"
+        >
+          <label className="text-sm font-bold text-foreground">{sliderLabel}</label>
           <Slider
             min={sliderMin}
             max={sliderMax}
@@ -80,14 +116,14 @@ const QuizStep = ({
             onValueChange={([v]) => onSliderChange?.(v)}
             className="py-2"
           />
-          <div className="flex justify-between text-xs text-muted-foreground">
+          <div className="flex justify-between items-center text-xs text-muted-foreground">
             <span>Too Thin</span>
-            <span className="font-semibold text-foreground">
+            <span className="font-bold text-foreground text-sm px-3 py-1 rounded-full bg-primary/10">
               {sliderValue} — {bodyConditionLabels[sliderValue] || ''}
             </span>
             <span>Overweight</span>
           </div>
-        </div>
+        </motion.div>
       )}
     </div>
   );
