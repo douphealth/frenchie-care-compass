@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { RefreshCcw, Share2 } from 'lucide-react';
+import { RefreshCcw, Share2, Download } from 'lucide-react';
 import PlanResults from './PlanResults';
 import { PlanSection } from '@/lib/planGenerator';
 import { QuizAnswers } from '@/lib/quizData';
+import { generatePDF } from '@/lib/pdfGenerator';
 
 type Props = {
   plan: PlanSection[];
@@ -19,6 +20,10 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
     if (navigator.share) {
       await navigator.share({ title: 'My Frenchie Care Plan', text: 'Check out my personalized French Bulldog care plan!', url: window.location.href });
     }
+  };
+
+  const handleDownloadPDF = () => {
+    generatePDF(plan, answers);
   };
 
   return (
@@ -46,14 +51,32 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
 
       <PlanResults sections={plan} />
 
+      {/* Download Free PDF */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className="mt-6"
+      >
+        <Button
+          onClick={handleDownloadPDF}
+          variant="outline"
+          className="w-full h-12 rounded-xl font-bold gap-2"
+        >
+          <Download className="w-4 h-4" />
+          Download Free Care Plan PDF
+        </Button>
+      </motion.div>
+
       {/* Upgrade CTA */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
-        className="mt-6 glass-card rounded-2xl p-5 text-center space-y-3"
+        className="mt-4 glass-card rounded-2xl p-5 text-center space-y-3"
       >
-        <p className="text-sm font-bold text-foreground">Want a printable premium PDF?</p>
+        <p className="text-sm font-bold text-foreground">🌟 Want a premium 12-page care guide?</p>
+        <p className="text-xs text-muted-foreground">Custom feeding charts, grooming checklists, vet prep sheets & more</p>
         <Button
           onClick={onUpgrade}
           className="w-full h-12 rounded-xl font-bold gold-gradient text-premium-gold-foreground"
