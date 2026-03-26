@@ -7,7 +7,11 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const rawResendApiKey = Deno.env.get("RESEND_API_KEY") ?? "";
+const RESEND_API_KEY = rawResendApiKey
+  .trim()
+  .replace(/^Bearer\s+/i, "")
+  .replace(/^['"]|['"]$/g, "");
 const FROM_EMAIL = "FrenchyFab <onboarding@resend.dev>";
 
 function buildWelcomeHTML(answers: Record<string, any>): string {
