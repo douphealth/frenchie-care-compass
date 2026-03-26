@@ -11,7 +11,9 @@ const rawResendApiKey = Deno.env.get("RESEND_API_KEY") ?? "";
 const RESEND_API_KEY = rawResendApiKey
   .trim()
   .replace(/^Bearer\s+/i, "")
-  .replace(/^['"]|['"]$/g, "");
+  .replace(/^['"]|['"]$/g, "")
+  .replace(/\s+/g, "")
+  .replace(/,$/, "");
 const FROM_EMAIL = "FrenchyFab <onboarding@resend.dev>";
 
 function buildWelcomeHTML(answers: Record<string, any>): string {
