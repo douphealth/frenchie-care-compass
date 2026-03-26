@@ -309,7 +309,8 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
 
   // TOC items as styled cards
   plan.forEach((section, i) => {
-    doc.setFillColor(i % 2 === 0 ? [...C.white] : [...C.offWhite]);
+    const bgColor = i % 2 === 0 ? C.white : C.offWhite;
+    doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
     doc.roundedRect(mx, y, contentW, 12, 2, 2, 'F');
 
     doc.setFontSize(9.5);
