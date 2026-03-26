@@ -7,6 +7,7 @@ import ResultsScreen from '@/components/ResultsScreen';
 import PremiumUpsell from '@/components/PremiumUpsell';
 import { quizSteps, QuizAnswers } from '@/lib/quizData';
 import { generatePlan, PlanSection } from '@/lib/planGenerator';
+import { supabase } from '@/integrations/supabase/client';
 
 type Screen = 'landing' | 'quiz' | 'emailGate' | 'results' | 'upsell';
 
