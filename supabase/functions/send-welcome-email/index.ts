@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const FROM_EMAIL = "FrenchyFab <care@frenchyfab.com>";
+const FROM_EMAIL = "FrenchyFab <onboarding@resend.dev>";
 
 function buildWelcomeHTML(answers: Record<string, any>): string {
   const stage = answers.lifeStage === 'puppy' ? 'Puppy' : answers.lifeStage === 'senior' ? 'Senior' : 'Adult';
