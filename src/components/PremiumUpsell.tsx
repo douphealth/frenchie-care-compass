@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Crown, FileText, CheckCircle2, Star, Download, Sparkles } from 'lucide-react';
+import { Crown, FileText, CheckCircle2, Star, Download, Sparkles, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 type Props = {
   onSkip: () => void;
@@ -16,6 +18,28 @@ const features = [
 ];
 
 const PremiumUpsell = ({ onSkip }: Props) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleCheckout = async () => {
+    setLoading(true);
+    try {
+      const email = localStorage.getItem('frenchie_email') || '';
+      const { data, error } = await supabase.functions.invoke('create-payment', {
+        body: { email },
+      });
+
+      if (error) throw error;
+      if (data?.url) {
+        window.open(data.url, '_blank');
+      }
+    } catch (err) {
+      console.error('Checkout error:', err);
+      alert('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen px-5 py-8 max-w-lg mx-auto flex flex-col">
       {/* Header */}
@@ -110,15 +134,17 @@ const PremiumUpsell = ({ onSkip }: Props) => {
           transition={{ duration: 0.4, delay: 0.5 }}
         >
           <Button
-            onClick={() => {
-              // Placeholder — Stripe integration will be added with Lovable Cloud
-              alert('Stripe payment coming soon! Enable Lovable Cloud to activate $7.99 checkout.');
-            }}
+            onClick={handleCheckout}
+            disabled={loading}
             size="lg"
             className="w-full h-14 rounded-2xl text-base font-black gap-2 gold-gradient text-premium-gold-foreground hover:opacity-90 transition-opacity shadow-xl shadow-premium-gold/20"
           >
-            <Download className="w-5 h-5" />
-            Get Premium PDF — $7.99
+            {loading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Download className="w-5 h-5" />
+            )}
+            {loading ? 'Opening checkout...' : 'Get Premium PDF — $7.99'}
           </Button>
           <p className="text-center text-xs text-muted-foreground mt-2">
             One-time payment · Instant download · No subscription
