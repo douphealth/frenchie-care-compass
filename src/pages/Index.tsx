@@ -45,11 +45,20 @@ const Index = () => {
     else setScreen('landing');
   };
 
-  const handleEmailSubmit = (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
     localStorage.setItem('frenchie_email', email);
     setScreen('results');
+
+    // Fire-and-forget: send welcome email with premium upsell
+    try {
+      await supabase.functions.invoke('send-welcome-email', {
+        body: { email, answers },
+      });
+    } catch (err) {
+      console.log('Email send attempted:', err);
+    }
   };
 
   const handleStartOver = () => {
