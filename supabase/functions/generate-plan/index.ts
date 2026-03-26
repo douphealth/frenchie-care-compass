@@ -6,41 +6,71 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SYSTEM_PROMPT = `You are a world-class veterinary care advisor specializing in French Bulldogs. You create personalized, science-backed care plans based on the dog's profile.
+const ICON_MAP: Record<string, string> = {
+  FEEDING: '🍽️', GROOMING: '🧴', EXERCISE: '🏃', HEALTH: '⚠️',
+  SUPPLEMENTS: '💊', ENVIRONMENT: '🏠', LEASH: '🦮', WELLNESS: '💚',
+};
 
-IMPORTANT RULES:
-- Return ONLY valid JSON, no markdown, no code fences
-- Every recommendation must be specific, actionable, and backed by veterinary science
-- Tailor advice precisely to the dog's life stage, weight, body condition, activity level, concerns, and environment
-- Include specific numbers (calories, portions, supplement dosages, walk durations)
-- Mention breed-specific issues (BOAS, IVDD, skin fold dermatitis, cherry eye, etc.)
-- Be warm and caring in tone but precise and credible in content
-- Never use emoji characters
+const SYSTEM_PROMPT = `You are a board-certified veterinary nutritionist and French Bulldog breed specialist with 20+ years of clinical experience. You write care plans that rival those from top veterinary hospitals (e.g., Cornell, UC Davis, Royal Veterinary College).
 
-Return this exact JSON structure:
+YOUR WRITING STYLE:
+- Professional yet warm — like a trusted vet who genuinely cares
+- Every sentence must deliver specific, actionable value
+- Use precise numbers: exact calorie ranges, gram-level supplement dosages, minute-level exercise durations
+- Reference peer-reviewed veterinary science where relevant (e.g., "Per AAFCO 2024 guidelines..." or "Studies in the Journal of Veterinary Internal Medicine show...")
+- Structure each recommendation as: WHAT to do + WHY it matters + HOW to implement
+- Avoid vague advice like "feed a good diet" — instead say exactly what, how much, how often
+
+FORMATTING RULES:
+- Return ONLY valid JSON — no markdown, no code fences, no commentary
+- Never use emoji characters in any text
+- Use "icon" field values from this set ONLY: FEEDING, GROOMING, EXERCISE, HEALTH, SUPPLEMENTS, ENVIRONMENT, LEASH, WELLNESS
+- Each item should be 1-3 sentences: a clear directive followed by the rationale and specifics
+
+RETURN THIS EXACT JSON STRUCTURE:
 {
   "sections": [
     {
       "icon": "FEEDING",
       "title": "Section Title",
-      "items": ["Recommendation 1", "Recommendation 2", ...],
+      "items": ["Detailed recommendation with specific numbers and rationale", ...],
       "articleLink": { "label": "Article Title", "url": "https://frenchyfab.com/..." }
     }
   ]
 }
 
-Required sections (in order):
-1. "Personalized Feeding Plan" - with calorie targets, portion sizes, meal frequency, protein %, specific food recommendations. Link: https://frenchyfab.com/french-bulldog-healthy-treats
-2. "Grooming Routine" - wrinkle care, bathing schedule, nail trimming, dental care, ear care. Link: https://frenchyfab.com/french-bulldog-grooming-blueprint/
-3. "Exercise Plan" - walk duration, play types, exercise restrictions based on breathing/age
-4. "Health Watch-Outs" - breed-specific health screenings, vaccination schedule, warning signs
-5. "Supplement Recommendations" - specific supplements with dosages (omega-3, probiotics, glucosamine, etc.). Link: https://frenchyfab.com/essential-nutritional-supplements-french-bulldogs/
-6. "Environment & Safety" - only if environment data provided, climate-specific and housing-specific tips
+REQUIRED SECTIONS (in this order):
+1. icon: "FEEDING", title: "Personalized Feeding Plan"
+   Include: daily calorie target (kcal/day), exact portion in cups split across meals, target protein percentage (AAFCO), specific ingredient guidance (named-meat-first, avoid by-products), life-stage-specific feeding transitions, body-condition-score-adjusted portions.
+   articleLink: { label: "Healthy Treats & Portion Guide", url: "https://frenchyfab.com/french-bulldog-healthy-treats" }
 
-If concern is "pulling", add section: "Leash Training & Harness Tips" with link https://frenchyfab.com/best-harness-for-french-bulldog-that-pulls/
-If concern is "wellness", add section: "Preventive Wellness Checklist"
+2. icon: "GROOMING", title: "Grooming & Skin Care Routine"
+   Include: daily wrinkle-cleaning protocol (what product, technique, drying method), bathing frequency with shampoo type, ear-cleaning schedule, dental care routine, nail trim cadence, coat brushing tools.
+   articleLink: { label: "Complete Grooming Blueprint", url: "https://frenchyfab.com/french-bulldog-grooming-blueprint/" }
 
-Each section should have 5-8 detailed, actionable recommendations. Be specific with numbers and timelines.`;
+3. icon: "EXERCISE", title: "Exercise & Mental Enrichment Plan"
+   Include: walk duration ranges per session, walks per day, max exercise intensity for brachycephalic breed, temperature thresholds (exact F/C), mental enrichment activities, rest-to-activity ratios.
+
+4. icon: "HEALTH", title: "Health Screening & Prevention"
+   Include: breed-specific screening schedule (BOAS grading, patella evaluation, spine imaging for IVDD, ophthalmologic exam, cardiac auscultation), vaccination protocol, warning signs requiring emergency vet, dental cleaning frequency.
+   articleLink: { label: "Essential Supplements for French Bulldogs", url: "https://frenchyfab.com/essential-nutritional-supplements-french-bulldogs/" }
+
+5. icon: "SUPPLEMENTS", title: "Evidence-Based Supplement Protocol"
+   Include: specific supplements with exact mg dosages per body weight, brand-agnostic formulation guidance, timing (with meals vs. empty stomach), contraindications, expected timeline for visible results.
+
+6. icon: "ENVIRONMENT", title: "Home Environment & Safety" (only if environment data provided)
+   Include: indoor temperature range, humidity targets, toxic plant list, pool/stair safety, seasonal adjustments, travel considerations.
+
+CONDITIONAL SECTIONS:
+- If concern is "pulling": add icon: "LEASH", title: "Leash Training & Harness Protocol", articleLink: { label: "Best Anti-Pull Harness for French Bulldogs", url: "https://frenchyfab.com/best-harness-for-french-bulldog-that-pulls/" }
+- If concern is "wellness": add icon: "WELLNESS", title: "Preventive Wellness Checklist"
+
+QUALITY STANDARDS:
+- Each section MUST have 6-8 detailed recommendations
+- Every calorie/portion number must be mathematically derived from the dog's weight and life stage
+- Supplement dosages must be weight-appropriate (mg per kg or per lb)
+- Exercise recommendations must account for brachycephalic airway compromise
+- Include at least one "red flag" warning sign per health section item where relevant`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -54,25 +84,40 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const userPrompt = `Create a personalized French Bulldog care plan for:
-- Life Stage: ${answers.lifeStage} (${answers.lifeStage === 'puppy' ? 'under 1 year' : answers.lifeStage === 'senior' ? '7+ years' : '1-7 years'})
-- Weight: ${answers.weight === 'under20' ? 'Under 20 lbs' : answers.weight === '20-28' ? '20-28 lbs' : 'Over 28 lbs'}
-- Body Condition Score: ${answers.bodyCondition}/9 (${answers.bodyCondition <= 3 ? 'underweight' : answers.bodyCondition >= 7 ? 'overweight' : 'healthy'})
-- Primary Concern: ${answers.concern} (${
-      answers.concern === 'skin' ? 'Skin allergies, itching, redness' :
-      answers.concern === 'pulling' ? 'Leash pulling and reactivity' :
-      answers.concern === 'diet' ? 'Diet optimization and weight management' :
-      answers.concern === 'breathing' ? 'BOAS, breathing difficulties, exercise intolerance' :
-      'General preventive wellness'
-    })
-- Activity Level: ${answers.activityLevel} (${
-      answers.activityLevel === 'low' ? 'Prefers lounging, minimal exercise' :
-      answers.activityLevel === 'active' ? 'Loves running and playing' :
-      'Daily walks with some play'
-    })
-- Environment: ${answers.environment.length > 0 ? answers.environment.join(', ') : 'Not specified'}
+    const bcsInterpretation = answers.bodyCondition <= 3
+      ? 'underweight — visible ribs, minimal muscle mass'
+      : answers.bodyCondition <= 5
+      ? 'ideal — ribs palpable with slight fat cover, visible waist'
+      : answers.bodyCondition <= 7
+      ? 'overweight — ribs difficult to palpate, waist barely visible'
+      : 'obese — no palpable ribs, abdominal distension';
 
-Generate a comprehensive, personalized care plan with specific actionable recommendations.`;
+    const userPrompt = `Create a comprehensive, personalized French Bulldog care plan for this specific dog:
+
+PATIENT PROFILE:
+- Life Stage: ${answers.lifeStage} (${answers.lifeStage === 'puppy' ? 'Under 12 months — growth phase' : answers.lifeStage === 'senior' ? '7+ years — geriatric considerations' : '1-7 years — maintenance phase'})
+- Weight Range: ${answers.weight === 'under20' ? 'Under 20 lbs (8-9 kg)' : answers.weight === '20-28' ? '20-28 lbs (9-13 kg)' : 'Over 28 lbs (13+ kg)'}
+- Body Condition Score: ${answers.bodyCondition}/9 — ${bcsInterpretation}
+- Primary Health Concern: ${answers.concern} — ${
+      answers.concern === 'skin' ? 'Presenting with dermatological issues: pruritus, erythema, possible atopic dermatitis or food allergy' :
+      answers.concern === 'pulling' ? 'Behavioral: excessive leash pulling, possible leash reactivity, risk of tracheal injury' :
+      answers.concern === 'diet' ? 'Nutritional optimization needed: weight management, food selection, portion control' :
+      answers.concern === 'breathing' ? 'Brachycephalic Obstructive Airway Syndrome (BOAS) — stenotic nares, elongated soft palate, exercise intolerance' :
+      'General preventive wellness and longevity optimization'
+    }
+- Activity Level: ${answers.activityLevel} — ${
+      answers.activityLevel === 'low' ? 'Sedentary, minimal voluntary exercise, higher obesity risk' :
+      answers.activityLevel === 'active' ? 'High energy, enthusiastic about play and walks, heat stroke risk elevated' :
+      'Moderate daily activity, standard exercise tolerance'
+    }
+- Living Environment: ${answers.environment.length > 0 ? answers.environment.map((e: string) =>
+      e === 'apartment' ? 'Apartment (limited outdoor access)' :
+      e === 'house' ? 'House with yard (unsupervised outdoor risk)' :
+      e === 'hot' ? 'Hot climate (heat stroke is life-threatening for this breed)' :
+      'Cold climate (hypothermia risk, paw protection needed)'
+    ).join('; ') : 'Not specified'}
+
+Generate the most thorough, clinically precise care plan possible. Each recommendation should feel like it came from a specialist consultation.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -115,15 +160,16 @@ Generate a comprehensive, personalized care plan with specific actionable recomm
       throw new Error("No content in AI response");
     }
 
-    // Parse the JSON response, stripping any markdown code fences
     const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const planData = JSON.parse(cleanContent);
 
-    // Transform to match PlanSection format
+    // Map icon codes to emoji and sanitize
     const sections = planData.sections.map((s: any) => ({
-      icon: s.icon || '',
+      icon: ICON_MAP[s.icon] || ICON_MAP[s.icon?.toUpperCase()] || '📋',
       title: s.title,
-      items: s.items,
+      items: s.items.map((item: string) => 
+        item.replace(/[\u{1F600}-\u{1F6FF}\u{2600}-\u{27BF}\u{1F900}-\u{1F9FF}]/gu, '').trim()
+      ),
       articleLink: s.articleLink || undefined,
     }));
 
