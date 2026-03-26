@@ -5,11 +5,12 @@ import QuizScreen from '@/components/QuizScreen';
 import EmailGate from '@/components/EmailGate';
 import ResultsScreen from '@/components/ResultsScreen';
 import PremiumUpsell from '@/components/PremiumUpsell';
+import LoadingScreen from '@/components/LoadingScreen';
 import { quizSteps, QuizAnswers } from '@/lib/quizData';
 import { generatePlan, PlanSection } from '@/lib/planGenerator';
 import { supabase } from '@/integrations/supabase/client';
 
-type Screen = 'landing' | 'quiz' | 'emailGate' | 'results' | 'upsell';
+type Screen = 'landing' | 'quiz' | 'loading' | 'emailGate' | 'results' | 'upsell';
 
 const defaultAnswers: QuizAnswers = {
   lifeStage: '', weight: '', bodyCondition: 5, concern: '', activityLevel: '', environment: [],
@@ -31,11 +32,27 @@ const Index = () => {
     return !!val;
   }, [step, answers, currentStep]);
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step < quizSteps.length - 1) {
       setStep(s => s + 1);
     } else {
-      setPlan(generatePlan(answers));
+      // Quiz complete — generate AI plan
+      setScreen('loading');
+      try {
+        const { data, error } = await supabase.functions.invoke('generate-plan', {
+          body: { answers },
+        });
+
+        if (error || !data?.sections) {
+          console.log('AI plan failed, using template fallback:', error);
+          setPlan(generatePlan(answers));
+        } else {
+          setPlan(data.sections);
+        }
+      } catch (err) {
+        console.log('AI plan error, using template fallback:', err);
+        setPlan(generatePlan(answers));
+      }
       setScreen('emailGate');
     }
   };
@@ -71,7 +88,7 @@ const Index = () => {
   return (
     <AnimatePresence mode="wait">
       <motion.div
-        key={screen + (screen === 'quiz' ? '' : '')}
+        key={screen + (screen === 'quiz' ? `-${step}` : '')}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -90,6 +107,8 @@ const Index = () => {
             canProceed={canProceed()}
           />
         )}
+
+        {screen === 'loading' && <LoadingScreen />}
 
         {screen === 'emailGate' && (
           <EmailGate plan={plan} email={email} setEmail={setEmail} onSubmit={handleEmailSubmit} />
