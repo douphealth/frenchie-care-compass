@@ -68,14 +68,10 @@ const Index = () => {
     localStorage.setItem('frenchie_email', email);
     setScreen('results');
 
-    // Fire-and-forget: send welcome email with premium upsell
-    try {
-      await supabase.functions.invoke('send-welcome-email', {
-        body: { email, answers },
-      });
-    } catch (err) {
-      console.log('Email send attempted:', err);
-    }
+    // Fire-and-forget: send welcome email (silently ignore failures)
+    supabase.functions.invoke('send-welcome-email', {
+      body: { email, answers },
+    }).catch(() => {});
   };
 
   const handleStartOver = () => {
