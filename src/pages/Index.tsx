@@ -7,6 +7,7 @@ import ResultsScreen from '@/components/ResultsScreen';
 import PremiumUpsell from '@/components/PremiumUpsell';
 import { quizSteps, QuizAnswers } from '@/lib/quizData';
 import { generatePlan, PlanSection } from '@/lib/planGenerator';
+import { supabase } from '@/integrations/supabase/client';
 
 type Screen = 'landing' | 'quiz' | 'emailGate' | 'results' | 'upsell';
 
@@ -44,11 +45,20 @@ const Index = () => {
     else setScreen('landing');
   };
 
-  const handleEmailSubmit = (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
     localStorage.setItem('frenchie_email', email);
     setScreen('results');
+
+    // Fire-and-forget: send welcome email with premium upsell
+    try {
+      await supabase.functions.invoke('send-welcome-email', {
+        body: { email, answers },
+      });
+    } catch (err) {
+      console.log('Email send attempted:', err);
+    }
   };
 
   const handleStartOver = () => {
