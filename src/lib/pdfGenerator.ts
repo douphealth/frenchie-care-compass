@@ -319,29 +319,38 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   newPageBg();
 
   doc.setFillColor(...C.brown);
-  doc.rect(0, 0, pw, 100, 'F');
+  doc.rect(0, 0, pw, 105, 'F');
+
+  // Decorative gold accents
   doc.setFillColor(...C.gold);
-  doc.rect(0, 100, pw, 2, 'F');
+  doc.rect(0, 105, pw, 2.5, 'F');
+  doc.setFillColor(...C.terracotta);
+  doc.rect(0, 107.5, pw, 1, 'F');
 
   doc.setFontSize(12);
   doc.setTextColor(...C.goldLight);
   doc.setFont('helvetica', 'bold');
-  doc.text('FRENCHYFAB', pw / 2, 28, { align: 'center' });
+  doc.text('FRENCHYFAB', pw / 2, 22, { align: 'center' });
 
   doc.setDrawColor(...C.gold);
   doc.setLineWidth(0.5);
-  doc.line(pw / 2 - 20, 33, pw / 2 + 20, 33);
+  doc.line(pw / 2 - 20, 26, pw / 2 + 20, 26);
 
   doc.setFontSize(28);
   doc.setTextColor(...C.white);
   doc.setFont('helvetica', 'bold');
-  doc.text('Your Personalized', pw / 2, 55, { align: 'center' });
-  doc.text('Frenchie Care Plan', pw / 2, 68, { align: 'center' });
+  doc.text('Your Personalized', pw / 2, 42, { align: 'center' });
+  doc.text('Frenchie Care Plan', pw / 2, 56, { align: 'center' });
 
   doc.setFontSize(10);
   doc.setTextColor(...C.goldLight);
   doc.setFont('helvetica', 'normal');
-  doc.text('Science-Backed Recommendations for a Happier, Healthier French Bulldog', pw / 2, 85, { align: 'center' });
+  doc.text('Science-Backed Recommendations for a Happier, Healthier French Bulldog', pw / 2, 72, { align: 'center' });
+
+  // Hero Frenchie image on cover (centered, below header)
+  try {
+    doc.addImage(heroImg, 'PNG', pw / 2 - 25, 78, 50, 50);
+  } catch (e) { /* graceful fallback if image fails */ }
 
   // Profile card
   const cardY = 118;
