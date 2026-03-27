@@ -14,7 +14,7 @@ const RESEND_API_KEY = rawResendApiKey
   .replace(/^['"]|['"]$/g, "")
   .replace(/\s+/g, "")
   .replace(/,$/, "");
-const FROM_EMAIL = "FrenchyFab <onboarding@resend.dev>";
+const FROM_EMAIL = "FrenchyFab <hello@frenchyfab.com>";
 
 function buildWelcomeHTML(answers: Record<string, any>): string {
   const stage = answers.lifeStage === 'puppy' ? 'Puppy' : answers.lifeStage === 'senior' ? 'Senior' : 'Adult';
