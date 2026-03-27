@@ -161,10 +161,14 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   };
 
   const drawPageTitle = (title: string, accentColor: readonly [number, number, number] = C.terracotta) => {
+    // Add small paw icon next to title
+    try {
+      doc.addImage(pawImg, 'PNG', mx, y - 2, 8, 8);
+    } catch (e) { /* fallback */ }
     doc.setFontSize(18);
     doc.setTextColor(...C.brown);
     doc.setFont('helvetica', 'bold');
-    doc.text(title, mx, y + 5);
+    doc.text(title, mx + 10, y + 5);
     y += 12;
     doc.setDrawColor(...accentColor);
     doc.setLineWidth(0.8);
