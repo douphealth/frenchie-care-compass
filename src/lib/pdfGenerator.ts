@@ -450,7 +450,7 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   doc.text('BONUS PREMIUM PAGES', mx + 6, y + 5.5);
   y += 12;
 
-  bonusPages.forEach((bp) => {
+  bonusPages.forEach((bp: { label: string; color: readonly [number, number, number] }) => {
     doc.setFillColor(...bp.color);
     doc.circle(mx + 6, y + 2, 2, 'F');
     doc.setFontSize(8.5);
