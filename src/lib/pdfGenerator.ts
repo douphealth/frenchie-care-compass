@@ -20,18 +20,28 @@ const C = {
   warningBg:  [255, 245, 225] as const,
   warningBd:  [225, 170, 70]  as const,
   accentBg:   [240, 230, 218] as const,
+  // Section colors
+  orange:     [235, 130, 60]  as const,
+  orangeBg:   [255, 245, 235] as const,
+  emerald:    [52, 160, 110]  as const,
+  emeraldBg:  [235, 250, 240] as const,
+  sky:        [56, 150, 220]  as const,
+  skyBg:      [235, 245, 255] as const,
+  violet:     [130, 90, 200]  as const,
+  violetBg:   [245, 240, 255] as const,
+  rose:       [220, 80, 100]  as const,
+  roseBg:     [255, 240, 242] as const,
 };
 
-/* ── Text icon map (replaces emoji with text labels) ── */
-const SECTION_ICONS: Record<string, string> = {
-  'Personalized Feeding Plan':      '[FEEDING]',
-  'Grooming Routine':               '[GROOMING]',
-  'Exercise Plan':                  '[EXERCISE]',
-  'Health Watch-Outs':              '[HEALTH]',
-  'Supplement Recommendations':     '[SUPPLEMENTS]',
-  'Environment & Safety':           '[ENVIRONMENT]',
-  'Leash Training & Harness Tips':  '[TRAINING]',
-  'Preventive Wellness Checklist':  '[WELLNESS]',
+const SECTION_COLORS: Record<number, { accent: readonly [number, number, number]; bg: readonly [number, number, number] }> = {
+  0: { accent: C.orange, bg: C.orangeBg },
+  1: { accent: C.rose, bg: C.roseBg },
+  2: { accent: C.emerald, bg: C.emeraldBg },
+  3: { accent: C.rose, bg: C.roseBg },
+  4: { accent: C.violet, bg: C.violetBg },
+  5: { accent: C.sky, bg: C.skyBg },
+  6: { accent: C.gold, bg: C.goldLight },
+  7: { accent: C.emerald, bg: C.emeraldBg },
 };
 
 function stageLabel(s: string) { return s === 'puppy' ? 'Puppy' : s === 'senior' ? 'Senior' : 'Adult'; }
@@ -42,7 +52,6 @@ function concernLabel(c: string) {
   return m[c] || c;
 }
 
-/** Strip emoji from strings for clean PDF rendering */
 function stripEmoji(str: string): string {
   return str
     .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
@@ -84,7 +93,6 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
     pageNum++;
     doc.setFillColor(...C.cream);
     doc.rect(0, 0, pw, ph, 'F');
-    // Top accent stripe
     doc.setFillColor(...C.brown);
     doc.rect(0, 0, pw, 3, 'F');
     doc.setFillColor(...C.terracotta);
@@ -92,38 +100,42 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   };
 
   const addFooter = () => {
-    // Footer line
     doc.setDrawColor(...C.border);
     doc.setLineWidth(0.3);
     doc.line(mx, ph - 14, pw - mx, ph - 14);
-    // Left text
     doc.setFontSize(7);
     doc.setTextColor(...C.textMuted);
     doc.setFont('helvetica', 'normal');
     doc.text('FrenchyFab.com  |  Your French Bulldog Care Companion', mx, ph - 9);
-    // Right page number
     doc.text(`Page ${pageNum}`, pw - mx, ph - 9, { align: 'right' });
   };
 
-  const drawSectionHeader = (title: string) => {
+  const drawSectionHeader = (title: string, sectionIdx: number) => {
     ensureSpace(22);
-    // Rounded header bar
-    doc.setFillColor(...C.brown);
+    const colors = SECTION_COLORS[sectionIdx % 8];
+    doc.setFillColor(...colors.accent);
     doc.roundedRect(mx, y, contentW, 14, 3, 3, 'F');
     doc.setFontSize(12);
     doc.setTextColor(...C.white);
     doc.setFont('helvetica', 'bold');
-    const icon = SECTION_ICONS[title] || '';
-    doc.text(`${icon}  ${stripEmoji(title)}`.trim(), mx + 6, y + 9.5);
+    doc.text(stripEmoji(title), mx + 6, y + 9.5);
+    // Section number badge
+    doc.setFillColor(...C.white);
+    doc.circle(pw - mx - 10, y + 7, 5, 'F');
+    doc.setFontSize(8);
+    doc.setTextColor(...colors.accent);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${sectionIdx + 1}`, pw - mx - 10, y + 8.5, { align: 'center' });
     y += 18;
   };
 
-  const drawItemCard = (text: string, isWarning: boolean) => {
+  const drawItemCard = (text: string, isWarning: boolean, idx: number, sectionIdx: number) => {
     const cleanText = stripEmoji(text.replace(/^[^\w\s]*\s*/, ''));
     const lines = doc.splitTextToSize(cleanText, contentW - 18);
     const blockH = Math.max(lines.length * 5 + 6, 12);
 
     ensureSpace(blockH + 3);
+    const colors = SECTION_COLORS[sectionIdx % 8];
 
     if (isWarning) {
       doc.setFillColor(...C.warningBg);
@@ -131,7 +143,6 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
       doc.setDrawColor(...C.warningBd);
       doc.setLineWidth(0.4);
       doc.roundedRect(mx, y, contentW, blockH, 2, 2, 'S');
-      // Warning indicator
       doc.setFillColor(...C.gold);
       doc.roundedRect(mx, y, 3, blockH, 1, 1, 'F');
     } else {
@@ -140,20 +151,23 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
       doc.setDrawColor(...C.border);
       doc.setLineWidth(0.2);
       doc.roundedRect(mx, y, contentW, blockH, 2, 2, 'S');
-      // Accent indicator
-      doc.setFillColor(...C.terracotta);
+      doc.setFillColor(...colors.accent);
       doc.roundedRect(mx, y, 2.5, blockH, 1, 1, 'F');
     }
 
-    // Bullet dot
-    const bulletColor = isWarning ? C.gold : C.terracotta;
-    doc.setFillColor(bulletColor[0], bulletColor[1], bulletColor[2]);
-    doc.circle(mx + 7, y + 5, 1, 'F');
+    // Numbered badge
+    const badgeColor = isWarning ? C.gold : colors.accent;
+    doc.setFillColor(badgeColor[0], badgeColor[1], badgeColor[2]);
+    doc.roundedRect(mx + 5, y + 2.5, 8, 6, 1.5, 1.5, 'F');
+    doc.setFontSize(7);
+    doc.setTextColor(...C.white);
+    doc.setFont('helvetica', 'bold');
+    doc.text(isWarning ? '!' : `${idx + 1}`, mx + 9, y + 6.5, { align: 'center' });
 
     doc.setFontSize(8.5);
     doc.setTextColor(...C.text);
     doc.setFont('helvetica', 'normal');
-    doc.text(lines, mx + 11, y + 5.5);
+    doc.text(lines, mx + 16, y + 5.5);
 
     y += blockH + 2;
   };
@@ -176,26 +190,26 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
     y += 14;
   };
 
-  /* ════════════════════════════════════════════════════
+  /* ═══════════════════════════════════════════════
    * COVER PAGE
-   * ════════════════════════════════════════════════════ */
+   * ═══════════════════════════════════════════════ */
   newPageBg();
 
-  // Large brown header area
+  // Full brown header
   doc.setFillColor(...C.brown);
   doc.rect(0, 0, pw, 100, 'F');
 
-  // Gold accent line
+  // Gold accent
   doc.setFillColor(...C.gold);
   doc.rect(0, 100, pw, 2, 'F');
 
-  // Brand name
+  // Brand
   doc.setFontSize(12);
   doc.setTextColor(...C.goldLight);
   doc.setFont('helvetica', 'bold');
   doc.text('FRENCHYFAB', pw / 2, 28, { align: 'center' });
 
-  // Decorative line under brand
+  // Decorative line
   doc.setDrawColor(...C.gold);
   doc.setLineWidth(0.5);
   doc.line(pw / 2 - 20, 33, pw / 2 + 20, 33);
@@ -233,7 +247,6 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   doc.setFont('helvetica', 'bold');
   doc.text('YOUR FRENCHIE\'S PROFILE', pw / 2, cardY + 9.5, { align: 'center' });
 
-  // Profile details - two columns
   const profileData = [
     ['Life Stage', stageLabel(answers.lifeStage)],
     ['Weight Range', weightLabel(answers.weight)],
@@ -269,29 +282,38 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   doc.setFont('helvetica', 'normal');
   doc.text(`Generated on ${today}`, pw / 2, 228, { align: 'center' });
 
-  // FrenchyFab links section
-  doc.setFillColor(...C.white);
-  doc.roundedRect(mx + 12, 240, contentW - 24, 32, 4, 4, 'F');
-  doc.setDrawColor(...C.border);
-  doc.setLineWidth(0.2);
-  doc.roundedRect(mx + 12, 240, contentW - 24, 32, 4, 4, 'S');
+  // Trust badges
+  const badgeY = 240;
+  doc.setFillColor(...C.successBg);
+  doc.roundedRect(mx + 12, badgeY, (contentW - 28) / 3, 18, 3, 3, 'F');
+  doc.setFillColor(...C.skyBg);
+  doc.roundedRect(mx + 12 + (contentW - 28) / 3 + 2, badgeY, (contentW - 28) / 3, 18, 3, 3, 'F');
+  doc.setFillColor(...C.orangeBg);
+  doc.roundedRect(mx + 12 + ((contentW - 28) / 3 + 2) * 2, badgeY, (contentW - 28) / 3, 18, 3, 3, 'F');
 
-  doc.setFontSize(8);
-  doc.setTextColor(...C.brown);
+  doc.setFontSize(7);
   doc.setFont('helvetica', 'bold');
-  doc.text('EXPLORE MORE AT FRENCHYFAB.COM', pw / 2, 248, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...C.terracotta);
-  doc.setFontSize(7.5);
-  doc.text('frenchyfab.com/french-bulldog-healthy-treats', pw / 2, 255, { align: 'center' });
-  doc.text('frenchyfab.com/french-bulldog-grooming-blueprint', pw / 2, 260, { align: 'center' });
-  doc.text('frenchyfab.com/essential-nutritional-supplements-french-bulldogs', pw / 2, 265, { align: 'center' });
+  const bw = (contentW - 28) / 3;
+  doc.setTextColor(...C.emerald);
+  doc.text('Vet-Informed', mx + 12 + bw / 2, badgeY + 8, { align: 'center' });
+  doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.textMuted);
+  doc.text('Science-backed', mx + 12 + bw / 2, badgeY + 13, { align: 'center' });
+
+  doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.sky);
+  doc.text('Breed-Specific', mx + 12 + bw + 2 + bw / 2, badgeY + 8, { align: 'center' });
+  doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.textMuted);
+  doc.text('BOAS-aware', mx + 12 + bw + 2 + bw / 2, badgeY + 13, { align: 'center' });
+
+  doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.orange);
+  doc.text('AI-Personalized', mx + 12 + (bw + 2) * 2 + bw / 2, badgeY + 8, { align: 'center' });
+  doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.textMuted);
+  doc.text('Tailored for you', mx + 12 + (bw + 2) * 2 + bw / 2, badgeY + 13, { align: 'center' });
 
   addFooter();
 
-  /* ════════════════════════════════════════════════════
+  /* ═══════════════════════════════════════════════
    * TABLE OF CONTENTS
-   * ════════════════════════════════════════════════════ */
+   * ═══════════════════════════════════════════════ */
   doc.addPage();
   newPageBg();
   y = 22;
@@ -307,28 +329,63 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   doc.line(mx, y, mx + 45, y);
   y += 10;
 
-  // TOC items as styled cards
   plan.forEach((section, i) => {
-    const bgColor = i % 2 === 0 ? C.white : C.offWhite;
-    doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
-    doc.roundedRect(mx, y, contentW, 12, 2, 2, 'F');
+    const colors = SECTION_COLORS[i % 8];
+    doc.setFillColor(...colors.bg);
+    doc.roundedRect(mx, y, contentW, 14, 2, 2, 'F');
+
+    // Left accent dot
+    doc.setFillColor(...colors.accent);
+    doc.circle(mx + 8, y + 7, 3, 'F');
+    doc.setFontSize(7);
+    doc.setTextColor(...C.white);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${i + 1}`, mx + 8, y + 8.5, { align: 'center' });
 
     doc.setFontSize(9.5);
     doc.setTextColor(...C.text);
     doc.setFont('helvetica', 'bold');
-    const icon = SECTION_ICONS[section.title] || '';
-    doc.text(`${icon}  ${stripEmoji(section.title)}`, mx + 5, y + 8);
+    doc.text(stripEmoji(section.title), mx + 15, y + 8);
 
     doc.setTextColor(...C.textMuted);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.text(`${section.items.length} recommendations`, pw - mx - 5, y + 8, { align: 'right' });
 
-    y += 14;
+    y += 16;
   });
 
-  // Disclaimer
+  // Quick stats summary
   y += 6;
+  doc.setFillColor(...C.white);
+  doc.roundedRect(mx, y, contentW, 28, 3, 3, 'F');
+  doc.setDrawColor(...C.border);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(mx, y, contentW, 28, 3, 3, 'S');
+
+  const totalItems = plan.reduce((sum, s) => sum + s.items.length, 0);
+  const statsData = [
+    { label: 'Sections', value: `${plan.length}` },
+    { label: 'Recommendations', value: `${totalItems}` },
+    { label: 'Confidence', value: 'High' },
+    { label: 'Updated', value: today.split(',')[0] },
+  ];
+  const statW = contentW / 4;
+  statsData.forEach((stat, i) => {
+    const sx = mx + statW * i + statW / 2;
+    doc.setFontSize(14);
+    doc.setTextColor(...C.brown);
+    doc.setFont('helvetica', 'bold');
+    doc.text(stat.value, sx, y + 12, { align: 'center' });
+    doc.setFontSize(6.5);
+    doc.setTextColor(...C.textMuted);
+    doc.setFont('helvetica', 'normal');
+    doc.text(stat.label.toUpperCase(), sx, y + 18, { align: 'center' });
+  });
+
+  y += 34;
+
+  // Disclaimer
   doc.setFillColor(...C.offWhite);
   doc.roundedRect(mx, y, contentW, 22, 3, 3, 'F');
   doc.setDrawColor(...C.border);
@@ -339,27 +396,27 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   doc.setTextColor(...C.textMuted);
   doc.setFont('helvetica', 'italic');
   const disclaimer = doc.splitTextToSize(
-    'DISCLAIMER: This care plan is for informational purposes only and does not replace professional veterinary advice. Always consult your veterinarian before making changes to your French Bulldog\'s diet, exercise, or health regimen. Recommendations are based on general breed-specific guidelines.',
+    'DISCLAIMER: This care plan is for informational purposes only and does not replace professional veterinary advice. Always consult your veterinarian before making changes to your French Bulldog\'s diet, exercise, or health regimen.',
     contentW - 12
   );
   doc.text(disclaimer, mx + 6, y + 6);
 
   addFooter();
 
-  /* ════════════════════════════════════════════════════
+  /* ═══════════════════════════════════════════════
    * SECTION PAGES
-   * ════════════════════════════════════════════════════ */
-  plan.forEach((section) => {
+   * ═══════════════════════════════════════════════ */
+  plan.forEach((section, sIdx) => {
     doc.addPage();
     newPageBg();
     y = 20;
 
-    drawSectionHeader(section.title);
+    drawSectionHeader(section.title, sIdx);
 
-    section.items.forEach((item) => {
+    section.items.forEach((item, j) => {
       const isWarning = item.includes('WARNING') || item.startsWith('\u26A0');
       const cleanItem = item.replace(/^[\u26A0\uFE0F\s]+/, '');
-      drawItemCard(cleanItem, isWarning);
+      drawItemCard(cleanItem, isWarning, j, sIdx);
     });
 
     if (section.articleLink) {
@@ -369,9 +426,174 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
     addFooter();
   });
 
-  /* ════════════════════════════════════════════════════
+  /* ═══════════════════════════════════════════════
+   * WEEKLY CARE CHECKLIST PAGE
+   * ═══════════════════════════════════════════════ */
+  doc.addPage();
+  newPageBg();
+  y = 20;
+
+  doc.setFontSize(18);
+  doc.setTextColor(...C.brown);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Weekly Care Checklist', mx, y + 5);
+  y += 12;
+  doc.setDrawColor(...C.terracotta);
+  doc.setLineWidth(0.8);
+  doc.line(mx, y, mx + 45, y);
+  y += 10;
+
+  const checklistSections: { title: string; color: readonly [number, number, number]; bg: readonly [number, number, number]; items: string[] }[] = [
+    {
+      title: 'DAILY',
+      color: C.emerald,
+      bg: C.emeraldBg,
+      items: [
+        'Fresh water bowl (change 2x daily)',
+        `Feed ${answers.lifeStage === 'puppy' ? '3 meals' : '2 meals'} at consistent times`,
+        'Clean facial wrinkles & nose fold',
+        `${answers.activityLevel === 'active' ? '30-40' : '15-25'} min walk (avoid heat)`,
+        'Check ears for redness or odor',
+        'Brief teeth/gum inspection',
+      ],
+    },
+    {
+      title: 'WEEKLY',
+      color: C.sky,
+      bg: C.skyBg,
+      items: [
+        'Full body inspection (lumps, irritation)',
+        'Brush coat (2-3x per week)',
+        'Clean ears with vet-approved solution',
+        'Trim nails if needed',
+        'Wash food & water bowls thoroughly',
+        'Rotate toys & enrichment activities',
+      ],
+    },
+    {
+      title: 'MONTHLY',
+      color: C.violet,
+      bg: C.violetBg,
+      items: [
+        'Weigh your Frenchie & log it',
+        'Deep clean bedding & crate',
+        'Flea/tick prevention treatment',
+        'Dental chew or brushing routine review',
+        'Review diet portions (adjust for weight)',
+        'Check emergency kit supplies',
+      ],
+    },
+  ];
+
+  checklistSections.forEach((cls) => {
+    ensureSpace(50);
+    // Section label
+    doc.setFillColor(...cls.color);
+    doc.roundedRect(mx, y, 32, 8, 2, 2, 'F');
+    doc.setFontSize(7);
+    doc.setTextColor(...C.white);
+    doc.setFont('helvetica', 'bold');
+    doc.text(cls.title, mx + 16, y + 5.5, { align: 'center' });
+    y += 12;
+
+    cls.items.forEach((item) => {
+      ensureSpace(10);
+      // Checkbox
+      doc.setFillColor(...cls.bg);
+      doc.roundedRect(mx, y, contentW, 8, 1.5, 1.5, 'F');
+      doc.setDrawColor(...C.border);
+      doc.setLineWidth(0.2);
+      doc.rect(mx + 4, y + 1.5, 5, 5, 'S');
+
+      doc.setFontSize(8);
+      doc.setTextColor(...C.text);
+      doc.setFont('helvetica', 'normal');
+      doc.text(stripEmoji(item), mx + 13, y + 5.5);
+      y += 9;
+    });
+    y += 4;
+  });
+
+  addFooter();
+
+  /* ═══════════════════════════════════════════════
+   * EMERGENCY QUICK REFERENCE PAGE
+   * ═══════════════════════════════════════════════ */
+  doc.addPage();
+  newPageBg();
+  y = 20;
+
+  doc.setFontSize(18);
+  doc.setTextColor(...C.brown);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Emergency Quick Reference', mx, y + 5);
+  y += 12;
+  doc.setDrawColor(...C.rose);
+  doc.setLineWidth(0.8);
+  doc.line(mx, y, mx + 45, y);
+  y += 10;
+
+  const emergencies = [
+    { title: 'Heatstroke', signs: 'Heavy panting, drooling, vomiting, wobbly gait', action: 'Move to shade/AC immediately. Apply cool (not cold) water to paws and belly. Rush to vet.' },
+    { title: 'Choking / Breathing Crisis', signs: 'Blue tongue/gums, gagging, pawing at mouth', action: 'Check airway for obstruction. If visible, carefully remove. CPR if needed. Emergency vet immediately.' },
+    { title: 'Allergic Reaction', signs: 'Swollen face/eyes, hives, difficulty breathing', action: 'Remove allergen if known. Benadryl (1mg/lb) if mild. Emergency vet if breathing is affected.' },
+    { title: 'Seizure', signs: 'Uncontrolled shaking, loss of consciousness, drooling', action: 'Do NOT restrain. Clear area of hazards. Time the seizure. Vet visit within 24 hours; emergency if > 3 min.' },
+    { title: 'Poisoning', signs: 'Vomiting, diarrhea, lethargy, tremors', action: 'Note what was ingested. Call ASPCA Poison Control: (888) 426-4435. Do NOT induce vomiting unless directed.' },
+  ];
+
+  emergencies.forEach((em) => {
+    ensureSpace(32);
+    doc.setFillColor(...C.roseBg);
+    doc.roundedRect(mx, y, contentW, 26, 3, 3, 'F');
+    doc.setDrawColor(...C.rose);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(mx, y, contentW, 26, 3, 3, 'S');
+    doc.setFillColor(...C.rose);
+    doc.roundedRect(mx, y, 3, 26, 1, 1, 'F');
+
+    doc.setFontSize(9);
+    doc.setTextColor(...C.rose);
+    doc.setFont('helvetica', 'bold');
+    doc.text(em.title, mx + 7, y + 6);
+
+    doc.setFontSize(7.5);
+    doc.setTextColor(...C.text);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Signs: ', mx + 7, y + 12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(em.signs, mx + 22, y + 12);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Action: ', mx + 7, y + 18);
+    doc.setFont('helvetica', 'normal');
+    const actionLines = doc.splitTextToSize(em.action, contentW - 28);
+    doc.text(actionLines, mx + 24, y + 18);
+
+    y += 30;
+  });
+
+  // Emergency contacts
+  y += 4;
+  ensureSpace(20);
+  doc.setFillColor(...C.white);
+  doc.roundedRect(mx, y, contentW, 16, 3, 3, 'F');
+  doc.setDrawColor(...C.rose);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(mx, y, contentW, 16, 3, 3, 'S');
+  doc.setFontSize(8);
+  doc.setTextColor(...C.brown);
+  doc.setFont('helvetica', 'bold');
+  doc.text('EMERGENCY CONTACTS', mx + 5, y + 6);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...C.text);
+  doc.text('ASPCA Poison Control: (888) 426-4435  |  Your Vet: _______________  |  Emergency Vet: _______________', mx + 5, y + 12);
+
+  addFooter();
+
+  /* ═══════════════════════════════════════════════
    * RESOURCES PAGE
-   * ════════════════════════════════════════════════════ */
+   * ═══════════════════════════════════════════════ */
   doc.addPage();
   newPageBg();
   y = 20;
@@ -400,8 +622,6 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
     doc.setDrawColor(...C.border);
     doc.setLineWidth(0.2);
     doc.roundedRect(mx, y, contentW, 24, 3, 3, 'S');
-
-    // Left accent
     doc.setFillColor(...C.terracotta);
     doc.roundedRect(mx, y, 3, 24, 1, 1, 'F');
 
@@ -422,7 +642,7 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
     y += 28;
   });
 
-  // Premium upsell card
+  // Premium upsell
   y += 8;
   ensureSpace(42);
   doc.setFillColor(...C.goldLight);
@@ -452,15 +672,14 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
 
   addFooter();
 
-  /* ════════════════════════════════════════════════════
+  /* ═══════════════════════════════════════════════
    * BACK PAGE
-   * ════════════════════════════════════════════════════ */
+   * ═══════════════════════════════════════════════ */
   doc.addPage();
   doc.setFillColor(...C.cream);
   doc.rect(0, 0, pw, ph, 'F');
   pageNum++;
 
-  // Bottom bar
   doc.setFillColor(...C.brown);
   doc.rect(0, ph - 4, pw, 4, 'F');
   doc.setFillColor(...C.gold);

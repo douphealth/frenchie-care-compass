@@ -6,6 +6,7 @@ import EmailGate from '@/components/EmailGate';
 import ResultsScreen from '@/components/ResultsScreen';
 import PremiumUpsell from '@/components/PremiumUpsell';
 import LoadingScreen from '@/components/LoadingScreen';
+import ExitIntentPopup from '@/components/ExitIntentPopup';
 import { quizSteps, QuizAnswers } from '@/lib/quizData';
 import { generatePlan, PlanSection } from '@/lib/planGenerator';
 import { supabase } from '@/integrations/supabase/client';
@@ -82,48 +83,51 @@ const Index = () => {
   };
 
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={screen + (screen === 'quiz' ? `-${step}` : '')}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.25 }}
-      >
-        {screen === 'landing' && <LandingHero onStart={() => setScreen('quiz')} />}
+    <>
+      {screen === 'landing' && <ExitIntentPopup onStartQuiz={() => setScreen('quiz')} />}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={screen + (screen === 'quiz' ? `-${step}` : '')}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.25 }}
+        >
+          {screen === 'landing' && <LandingHero onStart={() => setScreen('quiz')} />}
 
-        {screen === 'quiz' && (
-          <QuizScreen
-            step={step}
-            answers={answers}
-            onAnswer={(key, value) => setAnswers(prev => ({ ...prev, [key]: value }))}
-            onSliderChange={(v) => setAnswers(prev => ({ ...prev, bodyCondition: v }))}
-            onNext={handleNext}
-            onBack={handleBack}
-            canProceed={canProceed()}
-          />
-        )}
+          {screen === 'quiz' && (
+            <QuizScreen
+              step={step}
+              answers={answers}
+              onAnswer={(key, value) => setAnswers(prev => ({ ...prev, [key]: value }))}
+              onSliderChange={(v) => setAnswers(prev => ({ ...prev, bodyCondition: v }))}
+              onNext={handleNext}
+              onBack={handleBack}
+              canProceed={canProceed()}
+            />
+          )}
 
-        {screen === 'loading' && <LoadingScreen />}
+          {screen === 'loading' && <LoadingScreen />}
 
-        {screen === 'emailGate' && (
-          <EmailGate plan={plan} email={email} setEmail={setEmail} onSubmit={handleEmailSubmit} />
-        )}
+          {screen === 'emailGate' && (
+            <EmailGate plan={plan} email={email} setEmail={setEmail} onSubmit={handleEmailSubmit} />
+          )}
 
-        {screen === 'results' && (
-          <ResultsScreen
-            plan={plan}
-            answers={answers}
-            onStartOver={handleStartOver}
-            onUpgrade={() => setScreen('upsell')}
-          />
-        )}
+          {screen === 'results' && (
+            <ResultsScreen
+              plan={plan}
+              answers={answers}
+              onStartOver={handleStartOver}
+              onUpgrade={() => setScreen('upsell')}
+            />
+          )}
 
-        {screen === 'upsell' && (
-          <PremiumUpsell onSkip={() => setScreen('results')} />
-        )}
-      </motion.div>
-    </AnimatePresence>
+          {screen === 'upsell' && (
+            <PremiumUpsell onSkip={() => setScreen('results')} />
+          )}
+        </motion.div>
+      </AnimatePresence>
+    </>
   );
 };
 

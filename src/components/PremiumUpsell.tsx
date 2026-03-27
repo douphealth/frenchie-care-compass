@@ -1,8 +1,10 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Crown, FileText, CheckCircle2, Star, Download, Sparkles, Loader2 } from 'lucide-react';
+import { Crown, FileText, CheckCircle2, Star, Download, Sparkles, Loader2, Clock } from 'lucide-react';
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import FeatureComparison from './FeatureComparison';
+import SocialProof from './SocialProof';
 
 type Props = {
   onSkip: () => void;
@@ -126,6 +128,42 @@ const PremiumUpsell = ({ onSkip }: Props) => {
         </ul>
       </motion.div>
 
+      {/* Feature Comparison Table */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+        className="mb-6"
+      >
+        <h3 className="font-bold text-foreground text-sm flex items-center gap-2 mb-3">
+          Free vs Premium
+        </h3>
+        <FeatureComparison />
+      </motion.div>
+
+      {/* Urgency banner */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4, delay: 0.35 }}
+        className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-destructive/10 border border-destructive/20 mb-6"
+      >
+        <Clock className="w-4 h-4 text-destructive" />
+        <p className="text-xs font-bold text-destructive">
+          Launch price — increases to $12.99 soon
+        </p>
+      </motion.div>
+
+      {/* Social Proof / Testimonials */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.4 }}
+        className="mb-6"
+      >
+        <SocialProof />
+      </motion.div>
+
       {/* CTA */}
       <div className="mt-auto space-y-3">
         <motion.div
@@ -146,6 +184,12 @@ const PremiumUpsell = ({ onSkip }: Props) => {
             )}
             {loading ? 'Opening checkout...' : 'Get Premium PDF — $7.99'}
           </Button>
+          <div className="flex items-center justify-center gap-2 mt-3 py-2 px-4 rounded-lg bg-emerald-50 border border-emerald-200/50">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            <p className="text-xs font-bold text-emerald-700">
+              100% Money-Back Guarantee — No questions asked
+            </p>
+          </div>
           <p className="text-center text-xs text-muted-foreground mt-2">
             One-time payment · Instant download · No subscription
           </p>
