@@ -1,7 +1,20 @@
 import jsPDF from 'jspdf';
 import { PlanSection } from './planGenerator';
 import { QuizAnswers } from './quizData';
+import frenchieHeroUrl from '@/assets/frenchie-hero.png';
+import frenchieFaceUrl from '@/assets/frenchie-face.png';
+import pawIconUrl from '@/assets/paw-icon.png';
 
+/* ── Image loader helper ── */
+async function loadImageAsBase64(url: string): Promise<string> {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.readAsDataURL(blob);
+  });
+}
 /* ── Brand Palette (RGB) ── */
 const C = {
   cream:      [250, 245, 235] as const,
