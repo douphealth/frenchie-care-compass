@@ -1,8 +1,10 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Crown, FileText, CheckCircle2, Star, Download, Sparkles, Loader2 } from 'lucide-react';
+import { Crown, FileText, CheckCircle2, Star, Download, Sparkles, Loader2, Clock } from 'lucide-react';
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import FeatureComparison from './FeatureComparison';
+import SocialProof from './SocialProof';
 
 type Props = {
   onSkip: () => void;
