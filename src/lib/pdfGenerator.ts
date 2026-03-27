@@ -5,14 +5,24 @@ import frenchieHeroUrl from '@/assets/frenchie-hero.png';
 import frenchieFaceUrl from '@/assets/frenchie-face.png';
 import pawIconUrl from '@/assets/paw-icon.png';
 
-/* ── Image loader helper ── */
-async function loadImageAsBase64(url: string): Promise<string> {
+/* ── Image loader helper (compressed JPEG) ── */
+async function loadImageAsBase64(url: string, maxWidth = 300, quality = 0.6): Promise<string> {
   const response = await fetch(url);
   const blob = await response.blob();
   return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
-    reader.readAsDataURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src = URL.createObjectURL(blob);
   });
 }
 /* ── Brand Palette (RGB) ── */
