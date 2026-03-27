@@ -128,6 +128,42 @@ const PremiumUpsell = ({ onSkip }: Props) => {
         </ul>
       </motion.div>
 
+      {/* Feature Comparison Table */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+        className="mb-6"
+      >
+        <h3 className="font-bold text-foreground text-sm flex items-center gap-2 mb-3">
+          Free vs Premium
+        </h3>
+        <FeatureComparison />
+      </motion.div>
+
+      {/* Urgency banner */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4, delay: 0.35 }}
+        className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-destructive/10 border border-destructive/20 mb-6"
+      >
+        <Clock className="w-4 h-4 text-destructive" />
+        <p className="text-xs font-bold text-destructive">
+          Launch price — increases to $12.99 soon
+        </p>
+      </motion.div>
+
+      {/* Social Proof / Testimonials */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.4 }}
+        className="mb-6"
+      >
+        <SocialProof />
+      </motion.div>
+
       {/* CTA */}
       <div className="mt-auto space-y-3">
         <motion.div
