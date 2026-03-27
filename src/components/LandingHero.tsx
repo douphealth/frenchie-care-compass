@@ -83,7 +83,6 @@ const LandingHero = ({ onStart }: Props) => (
           <span className="font-bold text-foreground">12,400+</span> Frenchie owners got their plan
         </p>
       </motion.div>
-      </motion.div>
 
       {/* CTA */}
       <motion.div
