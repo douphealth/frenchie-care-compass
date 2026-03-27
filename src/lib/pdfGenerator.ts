@@ -253,7 +253,7 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
     // Data rows
     rows.forEach((row, rIdx) => {
       ensureSpace(rowH + 2);
-      const bgColor = rIdx % 2 === 0 ? C.white : C.offWhite;
+      const bgColor: readonly [number, number, number] = rIdx % 2 === 0 ? C.white : C.offWhite;
       doc.setFillColor(...bgColor);
       doc.rect(startX, y, tableW, rowH, 'F');
       doc.setDrawColor(...C.border);
