@@ -20,7 +20,6 @@ const C = {
   warningBg:  [255, 245, 225] as const,
   warningBd:  [225, 170, 70]  as const,
   accentBg:   [240, 230, 218] as const,
-  // Section colors
   orange:     [235, 130, 60]  as const,
   orangeBg:   [255, 245, 235] as const,
   emerald:    [52, 160, 110]  as const,
@@ -31,6 +30,10 @@ const C = {
   violetBg:   [245, 240, 255] as const,
   rose:       [220, 80, 100]  as const,
   roseBg:     [255, 240, 242] as const,
+  amber:      [200, 140, 40]  as const as readonly [number, number, number],
+  amberBg:    [255, 248, 230] as const as readonly [number, number, number],
+  teal:       [40, 145, 135]  as const as readonly [number, number, number],
+  tealBg:     [232, 248, 245] as const as readonly [number, number, number],
 };
 
 const SECTION_COLORS: Record<number, { accent: readonly [number, number, number]; bg: readonly [number, number, number] }> = {
@@ -79,11 +82,38 @@ function stripEmoji(str: string): string {
     .trim();
 }
 
+/* ── Feeding calculation helpers ── */
+function getCalories(w: string, stage: string, bc: number): { min: number; max: number } {
+  const weights: Record<string, [number, number]> = { under20: [10, 19], '20-28': [20, 28], over28: [29, 38] };
+  const [wMin, wMax] = weights[w] || [20, 28];
+  let calPerLb = 30;
+  if (stage === 'puppy') calPerLb = 40;
+  else if (stage === 'senior') calPerLb = 25;
+  if (bc > 6) calPerLb -= 5;
+  if (bc < 4) calPerLb += 5;
+  return { min: wMin * calPerLb, max: wMax * calPerLb };
+}
+
+function getMealsPerDay(stage: string): number { return stage === 'puppy' ? 3 : 2; }
+
+function getPortionPerMeal(w: string, stage: string, bc: number): { cups: string; grams: string } {
+  const cal = getCalories(w, stage, bc);
+  const avgCal = (cal.min + cal.max) / 2;
+  const meals = getMealsPerDay(stage);
+  const cupsPerMeal = avgCal / meals / 350; // ~350 cal per cup kibble
+  const gramsPerMeal = cupsPerMeal * 113; // ~113g per cup
+  return {
+    cups: `${cupsPerMeal.toFixed(1)} cups`,
+    grams: `${Math.round(gramsPerMeal)}g`,
+  };
+}
+
 export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pw = 210, ph = 297, mx = 16, contentW = pw - mx * 2;
   let y = 0;
   let pageNum = 0;
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   const ensureSpace = (needed: number) => {
     if (y + needed > ph - 22) { addFooter(); doc.addPage(); newPageBg(); y = 20; }
@@ -110,6 +140,18 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
     doc.text(`Page ${pageNum}`, pw - mx, ph - 9, { align: 'right' });
   };
 
+  const drawPageTitle = (title: string, accentColor: readonly [number, number, number] = C.terracotta) => {
+    doc.setFontSize(18);
+    doc.setTextColor(...C.brown);
+    doc.setFont('helvetica', 'bold');
+    doc.text(title, mx, y + 5);
+    y += 12;
+    doc.setDrawColor(...accentColor);
+    doc.setLineWidth(0.8);
+    doc.line(mx, y, mx + 45, y);
+    y += 10;
+  };
+
   const drawSectionHeader = (title: string, sectionIdx: number) => {
     ensureSpace(22);
     const colors = SECTION_COLORS[sectionIdx % 8];
@@ -119,7 +161,6 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
     doc.setTextColor(...C.white);
     doc.setFont('helvetica', 'bold');
     doc.text(stripEmoji(title), mx + 6, y + 9.5);
-    // Section number badge
     doc.setFillColor(...C.white);
     doc.circle(pw - mx - 10, y + 7, 5, 'F');
     doc.setFontSize(8);
@@ -133,7 +174,6 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
     const cleanText = stripEmoji(text.replace(/^[^\w\s]*\s*/, ''));
     const lines = doc.splitTextToSize(cleanText, contentW - 18);
     const blockH = Math.max(lines.length * 5 + 6, 12);
-
     ensureSpace(blockH + 3);
     const colors = SECTION_COLORS[sectionIdx % 8];
 
@@ -155,7 +195,6 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
       doc.roundedRect(mx, y, 2.5, blockH, 1, 1, 'F');
     }
 
-    // Numbered badge
     const badgeColor = isWarning ? C.gold : colors.accent;
     doc.setFillColor(badgeColor[0], badgeColor[1], badgeColor[2]);
     doc.roundedRect(mx + 5, y + 2.5, 8, 6, 1.5, 1.5, 'F');
@@ -168,7 +207,6 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
     doc.setTextColor(...C.text);
     doc.setFont('helvetica', 'normal');
     doc.text(lines, mx + 16, y + 5.5);
-
     y += blockH + 2;
   };
 
@@ -190,38 +228,96 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
     y += 14;
   };
 
+  /* Helper: draw a table */
+  const drawTable = (headers: string[], rows: string[][], colWidths: number[], headerColor: readonly [number, number, number]) => {
+    const rowH = 9;
+    const headerH = 10;
+    const tableW = colWidths.reduce((a, b) => a + b, 0);
+    const startX = mx + (contentW - tableW) / 2;
+
+    ensureSpace(headerH + rows.length * rowH + 4);
+
+    // Header row
+    doc.setFillColor(...headerColor);
+    doc.roundedRect(startX, y, tableW, headerH, 2, 2, 'F');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...C.white);
+    doc.setFont('helvetica', 'bold');
+    let colX = startX;
+    headers.forEach((h, i) => {
+      doc.text(h, colX + colWidths[i] / 2, y + 6.5, { align: 'center' });
+      colX += colWidths[i];
+    });
+    y += headerH;
+
+    // Data rows
+    rows.forEach((row, rIdx) => {
+      ensureSpace(rowH + 2);
+      const bgColor: readonly [number, number, number] = rIdx % 2 === 0 ? C.white : C.offWhite;
+      doc.setFillColor(...bgColor);
+      doc.rect(startX, y, tableW, rowH, 'F');
+      doc.setDrawColor(...C.border);
+      doc.setLineWidth(0.15);
+      doc.line(startX, y + rowH, startX + tableW, y + rowH);
+
+      doc.setFontSize(7.5);
+      doc.setTextColor(...C.text);
+      colX = startX;
+      row.forEach((cell, i) => {
+        doc.setFont('helvetica', i === 0 ? 'bold' : 'normal');
+        doc.text(cell, colX + colWidths[i] / 2, y + 6, { align: 'center' });
+        colX += colWidths[i];
+      });
+      y += rowH;
+    });
+
+    // Table border
+    doc.setDrawColor(...C.border);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(startX, y - rows.length * rowH - headerH, tableW, rows.length * rowH + headerH, 2, 2, 'S');
+    y += 4;
+  };
+
+  /* Helper: checklist item with checkbox */
+  const drawCheckItem = (text: string, bgColor: readonly [number, number, number]) => {
+    ensureSpace(10);
+    doc.setFillColor(...bgColor);
+    doc.roundedRect(mx, y, contentW, 8, 1.5, 1.5, 'F');
+    doc.setDrawColor(...C.border);
+    doc.setLineWidth(0.2);
+    doc.rect(mx + 4, y + 1.5, 5, 5, 'S');
+    doc.setFontSize(8);
+    doc.setTextColor(...C.text);
+    doc.setFont('helvetica', 'normal');
+    doc.text(stripEmoji(text), mx + 13, y + 5.5);
+    y += 9;
+  };
+
   /* ═══════════════════════════════════════════════
-   * COVER PAGE
+   * PAGE 1: COVER PAGE
    * ═══════════════════════════════════════════════ */
   newPageBg();
 
-  // Full brown header
   doc.setFillColor(...C.brown);
   doc.rect(0, 0, pw, 100, 'F');
-
-  // Gold accent
   doc.setFillColor(...C.gold);
   doc.rect(0, 100, pw, 2, 'F');
 
-  // Brand
   doc.setFontSize(12);
   doc.setTextColor(...C.goldLight);
   doc.setFont('helvetica', 'bold');
   doc.text('FRENCHYFAB', pw / 2, 28, { align: 'center' });
 
-  // Decorative line
   doc.setDrawColor(...C.gold);
   doc.setLineWidth(0.5);
   doc.line(pw / 2 - 20, 33, pw / 2 + 20, 33);
 
-  // Main title
   doc.setFontSize(28);
   doc.setTextColor(...C.white);
   doc.setFont('helvetica', 'bold');
   doc.text('Your Personalized', pw / 2, 55, { align: 'center' });
   doc.text('Frenchie Care Plan', pw / 2, 68, { align: 'center' });
 
-  // Subtitle
   doc.setFontSize(10);
   doc.setTextColor(...C.goldLight);
   doc.setFont('helvetica', 'normal');
@@ -236,7 +332,6 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   doc.setLineWidth(0.3);
   doc.roundedRect(mx + 12, cardY, contentW - 24, cardH, 5, 5, 'S');
 
-  // Card header stripe
   doc.setFillColor(...C.accentBg);
   doc.roundedRect(mx + 12, cardY, contentW - 24, 14, 5, 5, 'F');
   doc.setFillColor(...C.white);
@@ -245,7 +340,7 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   doc.setFontSize(9);
   doc.setTextColor(...C.brown);
   doc.setFont('helvetica', 'bold');
-  doc.text('YOUR FRENCHIE\'S PROFILE', pw / 2, cardY + 9.5, { align: 'center' });
+  doc.text("YOUR FRENCHIE'S PROFILE", pw / 2, cardY + 9.5, { align: 'center' });
 
   const profileData = [
     ['Life Stage', stageLabel(answers.lifeStage)],
@@ -265,18 +360,14 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
     const xLabel = i % 2 === 0 ? colX1 : colX2;
     const row = Math.floor(i / 2);
     const rowY = profileY + row * 16;
-
     doc.setTextColor(...C.textMuted);
     doc.setFont('helvetica', 'normal');
     doc.text(item[0].toUpperCase(), xLabel, rowY);
-
     doc.setTextColor(...C.text);
     doc.setFont('helvetica', 'bold');
     doc.text(item[1], xLabel, rowY + 6);
   });
 
-  // Date
-  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   doc.setFontSize(8);
   doc.setTextColor(...C.textMuted);
   doc.setFont('helvetica', 'normal');
@@ -284,17 +375,15 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
 
   // Trust badges
   const badgeY = 240;
-  doc.setFillColor(...C.successBg);
-  doc.roundedRect(mx + 12, badgeY, (contentW - 28) / 3, 18, 3, 3, 'F');
-  doc.setFillColor(...C.skyBg);
-  doc.roundedRect(mx + 12 + (contentW - 28) / 3 + 2, badgeY, (contentW - 28) / 3, 18, 3, 3, 'F');
-  doc.setFillColor(...C.orangeBg);
-  doc.roundedRect(mx + 12 + ((contentW - 28) / 3 + 2) * 2, badgeY, (contentW - 28) / 3, 18, 3, 3, 'F');
-
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'bold');
   const bw = (contentW - 28) / 3;
-  doc.setTextColor(...C.emerald);
+  doc.setFillColor(...C.successBg);
+  doc.roundedRect(mx + 12, badgeY, bw, 18, 3, 3, 'F');
+  doc.setFillColor(...C.skyBg);
+  doc.roundedRect(mx + 12 + bw + 2, badgeY, bw, 18, 3, 3, 'F');
+  doc.setFillColor(...C.orangeBg);
+  doc.roundedRect(mx + 12 + (bw + 2) * 2, badgeY, bw, 18, 3, 3, 'F');
+
+  doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.emerald);
   doc.text('Vet-Informed', mx + 12 + bw / 2, badgeY + 8, { align: 'center' });
   doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.textMuted);
   doc.text('Science-backed', mx + 12 + bw / 2, badgeY + 13, { align: 'center' });
@@ -312,29 +401,19 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   addFooter();
 
   /* ═══════════════════════════════════════════════
-   * TABLE OF CONTENTS
+   * PAGE 2: TABLE OF CONTENTS
    * ═══════════════════════════════════════════════ */
   doc.addPage();
   newPageBg();
   y = 22;
 
-  doc.setFontSize(18);
-  doc.setTextColor(...C.brown);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Care Plan Overview', mx, y + 5);
-  y += 12;
-
-  doc.setDrawColor(...C.terracotta);
-  doc.setLineWidth(0.8);
-  doc.line(mx, y, mx + 45, y);
-  y += 10;
+  drawPageTitle('Care Plan Overview');
 
   plan.forEach((section, i) => {
     const colors = SECTION_COLORS[i % 8];
     doc.setFillColor(...colors.bg);
     doc.roundedRect(mx, y, contentW, 14, 2, 2, 'F');
 
-    // Left accent dot
     doc.setFillColor(...colors.accent);
     doc.circle(mx + 8, y + 7, 3, 'F');
     doc.setFontSize(7);
@@ -351,11 +430,37 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.text(`${section.items.length} recommendations`, pw - mx - 5, y + 8, { align: 'right' });
-
     y += 16;
   });
 
-  // Quick stats summary
+  // Bonus pages listing
+  y += 4;
+  const bonusPages = [
+    { label: 'Custom Feeding Chart & Portions', color: C.orange },
+    { label: 'Printable Grooming Checklist', color: C.rose },
+    { label: 'Seasonal Care Calendar', color: C.emerald },
+    { label: 'Vet Visit Prep Sheets', color: C.sky },
+    { label: 'Emergency Quick Reference', color: C.rose },
+  ];
+  doc.setFillColor(...C.goldLight);
+  doc.roundedRect(mx, y, contentW, 8, 2, 2, 'F');
+  doc.setFontSize(7);
+  doc.setTextColor(...C.amber);
+  doc.setFont('helvetica', 'bold');
+  doc.text('BONUS PREMIUM PAGES', mx + 6, y + 5.5);
+  y += 12;
+
+  bonusPages.forEach((bp: { label: string; color: readonly [number, number, number] }) => {
+    doc.setFillColor(...bp.color);
+    doc.circle(mx + 6, y + 2, 2, 'F');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...C.text);
+    doc.setFont('helvetica', 'normal');
+    doc.text(bp.label, mx + 12, y + 3.5);
+    y += 8;
+  });
+
+  // Quick stats
   y += 6;
   doc.setFillColor(...C.white);
   doc.roundedRect(mx, y, contentW, 28, 3, 3, 'F');
@@ -367,7 +472,7 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   const statsData = [
     { label: 'Sections', value: `${plan.length}` },
     { label: 'Recommendations', value: `${totalItems}` },
-    { label: 'Confidence', value: 'High' },
+    { label: 'Bonus Pages', value: '5' },
     { label: 'Updated', value: today.split(',')[0] },
   ];
   const statW = contentW / 4;
@@ -382,7 +487,6 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
     doc.setFont('helvetica', 'normal');
     doc.text(stat.label.toUpperCase(), sx, y + 18, { align: 'center' });
   });
-
   y += 34;
 
   // Disclaimer
@@ -391,12 +495,11 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   doc.setDrawColor(...C.border);
   doc.setLineWidth(0.2);
   doc.roundedRect(mx, y, contentW, 22, 3, 3, 'S');
-
   doc.setFontSize(7);
   doc.setTextColor(...C.textMuted);
   doc.setFont('helvetica', 'italic');
   const disclaimer = doc.splitTextToSize(
-    'DISCLAIMER: This care plan is for informational purposes only and does not replace professional veterinary advice. Always consult your veterinarian before making changes to your French Bulldog\'s diet, exercise, or health regimen.',
+    "DISCLAIMER: This care plan is for informational purposes only and does not replace professional veterinary advice. Always consult your veterinarian before making changes to your French Bulldog's diet, exercise, or health regimen.",
     contentW - 12
   );
   doc.text(disclaimer, mx + 6, y + 6);
@@ -404,7 +507,7 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   addFooter();
 
   /* ═══════════════════════════════════════════════
-   * SECTION PAGES
+   * PAGES 3+: SECTION PAGES (Care Plan Content)
    * ═══════════════════════════════════════════════ */
   plan.forEach((section, sIdx) => {
     doc.addPage();
@@ -427,23 +530,495 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   });
 
   /* ═══════════════════════════════════════════════
+   * CUSTOM FEEDING CHART & PORTIONS PAGE
+   * ═══════════════════════════════════════════════ */
+  doc.addPage();
+  newPageBg();
+  y = 20;
+
+  drawPageTitle('Custom Feeding Chart & Portions', C.orange);
+
+  // Personalized calorie summary
+  const cal = getCalories(answers.weight, answers.lifeStage, answers.bodyCondition);
+  const meals = getMealsPerDay(answers.lifeStage);
+  const portion = getPortionPerMeal(answers.weight, answers.lifeStage, answers.bodyCondition);
+
+  doc.setFillColor(...C.orangeBg);
+  doc.roundedRect(mx, y, contentW, 24, 3, 3, 'F');
+  doc.setDrawColor(...C.orange);
+  doc.setLineWidth(0.4);
+  doc.roundedRect(mx, y, contentW, 24, 3, 3, 'S');
+  doc.setFontSize(9);
+  doc.setTextColor(...C.orange);
+  doc.setFont('helvetica', 'bold');
+  doc.text("YOUR FRENCHIE'S DAILY NUTRITION TARGET", mx + 6, y + 7);
+  doc.setFontSize(8);
+  doc.setTextColor(...C.text);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Daily Calories: ${cal.min}-${cal.max} kcal  |  Meals/Day: ${meals}  |  Per Meal: ~${portion.cups} (~${portion.grams})`, mx + 6, y + 15);
+  doc.text(`Based on: ${stageLabel(answers.lifeStage)}, ${weightLabel(answers.weight)}, Body Score ${answers.bodyCondition}/9, ${activityLabel(answers.activityLevel)} activity`, mx + 6, y + 21);
+  y += 30;
+
+  // Daily feeding schedule table
+  doc.setFontSize(11);
+  doc.setTextColor(...C.brown);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Daily Feeding Schedule', mx, y + 4);
+  y += 10;
+
+  const scheduleRows = answers.lifeStage === 'puppy'
+    ? [
+        ['Breakfast', '7:00 AM', portion.cups, portion.grams, 'Main kibble + DHA supplement'],
+        ['Lunch', '12:30 PM', portion.cups, portion.grams, 'Main kibble + probiotic'],
+        ['Dinner', '6:00 PM', portion.cups, portion.grams, 'Main kibble + fish oil'],
+      ]
+    : [
+        ['Breakfast', '7:30 AM', portion.cups, portion.grams, 'Main kibble + probiotic + fish oil'],
+        ['Dinner', '6:00 PM', portion.cups, portion.grams, 'Main kibble + any supplements'],
+      ];
+
+  drawTable(
+    ['Meal', 'Time', 'Cups', 'Grams', 'Notes'],
+    scheduleRows,
+    [28, 24, 22, 22, contentW - 96 > 40 ? contentW - 96 : 40],
+    C.orange
+  );
+
+  // Macronutrient targets
+  y += 4;
+  doc.setFontSize(11);
+  doc.setTextColor(...C.brown);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Macronutrient Targets', mx, y + 4);
+  y += 10;
+
+  const proteinTarget = answers.lifeStage === 'puppy' ? '22-28%' : answers.lifeStage === 'senior' ? '18-22%' : '22-26%';
+  const fatTarget = answers.lifeStage === 'puppy' ? '10-15%' : answers.lifeStage === 'senior' ? '8-12%' : '10-15%';
+  const fiberTarget = '3-5%';
+
+  drawTable(
+    ['Nutrient', 'Target %', 'Why It Matters', 'Food Sources'],
+    [
+      ['Protein', proteinTarget, 'Muscle maintenance & repair', 'Chicken, salmon, turkey, beef'],
+      ['Fat', fatTarget, 'Energy, coat health, brain function', 'Fish oil, chicken fat, flaxseed'],
+      ['Fiber', fiberTarget, 'Digestive regularity', 'Sweet potato, pumpkin, oats'],
+      ['Omega-3', '0.5-1%', 'Anti-inflammatory, skin & coat', 'Salmon oil, sardines, algae'],
+    ],
+    [24, 22, 46, contentW - 92 > 40 ? contentW - 92 : 40],
+    C.emerald
+  );
+
+  // Treat allowance
+  y += 4;
+  doc.setFontSize(11);
+  doc.setTextColor(...C.brown);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Daily Treat Allowance (10% Rule)', mx, y + 4);
+  y += 10;
+
+  const treatCal = Math.round((cal.min + cal.max) / 2 * 0.1);
+  const safeTreats = [
+    ['Blueberries (5-6)', `~${Math.round(treatCal * 0.15)} kcal`, 'Antioxidants, vitamins'],
+    ['Baby carrot sticks (2-3)', `~${Math.round(treatCal * 0.1)} kcal`, 'Low cal, dental health'],
+    ['Frozen green beans', `~${Math.round(treatCal * 0.08)} kcal`, 'Filling, very low calorie'],
+    ['Small training treats', `~${Math.round(treatCal * 0.3)} kcal`, 'Use for obedience work'],
+    ['Plain pumpkin (1 tbsp)', `~${Math.round(treatCal * 0.12)} kcal`, 'Fiber, digestive support'],
+  ];
+
+  drawTable(
+    ['Safe Treat', `Calories (of ${treatCal} kcal budget)`, 'Benefit'],
+    safeTreats,
+    [46, 52, contentW - 98 > 30 ? contentW - 98 : 30],
+    C.amber
+  );
+
+  // Foods to avoid
+  y += 4;
+  ensureSpace(40);
+  doc.setFillColor(...C.roseBg);
+  doc.roundedRect(mx, y, contentW, 34, 3, 3, 'F');
+  doc.setDrawColor(...C.rose);
+  doc.setLineWidth(0.4);
+  doc.roundedRect(mx, y, contentW, 34, 3, 3, 'S');
+  doc.setFillColor(...C.rose);
+  doc.roundedRect(mx, y, 3, 34, 1, 1, 'F');
+
+  doc.setFontSize(9);
+  doc.setTextColor(...C.rose);
+  doc.setFont('helvetica', 'bold');
+  doc.text('FOODS TO AVOID -- TOXIC TO FRENCH BULLDOGS', mx + 8, y + 7);
+
+  doc.setFontSize(7.5);
+  doc.setTextColor(...C.text);
+  doc.setFont('helvetica', 'normal');
+  const toxicFoods = [
+    'Chocolate (theobromine toxicity)  |  Grapes & Raisins (kidney failure)  |  Onions & Garlic (hemolytic anemia)',
+    'Xylitol / artificial sweeteners  |  Macadamia nuts  |  Cooked bones (splintering risk)',
+    'Avocado (persin toxicity)  |  Alcohol  |  Caffeine  |  Raw yeast dough',
+  ];
+  toxicFoods.forEach((line, i) => {
+    doc.text(line, mx + 8, y + 14 + i * 6);
+  });
+  y += 40;
+
+  addFooter();
+
+  /* ═══════════════════════════════════════════════
+   * PRINTABLE GROOMING CHECKLIST PAGE
+   * ═══════════════════════════════════════════════ */
+  doc.addPage();
+  newPageBg();
+  y = 20;
+
+  drawPageTitle('Printable Grooming Checklist', C.rose);
+
+  const groomingSections = [
+    {
+      title: 'DAILY CARE',
+      color: C.emerald,
+      bg: C.emeraldBg,
+      items: [
+        'Clean facial wrinkles with damp cloth -- dry thoroughly',
+        'Clean nose fold / rope area',
+        'Wipe under-eye area (tear stains)',
+        'Check ears for redness, odor, or discharge',
+        'Quick teeth/gum visual check',
+        'Inspect paw pads for cuts or irritation',
+      ],
+    },
+    {
+      title: 'WEEKLY CARE',
+      color: C.sky,
+      bg: C.skyBg,
+      items: [
+        'Full body massage & skin inspection',
+        'Brush coat 2-3x with rubber curry brush',
+        'Clean ears with vet-approved ear solution',
+        'Check between toes for yeast/redness',
+        'Brush teeth with enzymatic dog toothpaste (3-4x/week)',
+        'Inspect tail pocket and clean if needed',
+      ],
+    },
+    {
+      title: 'BIWEEKLY / MONTHLY',
+      color: C.violet,
+      bg: C.violetBg,
+      items: [
+        'Trim nails (every 2-3 weeks)',
+        'Bath with pH-balanced, hypoallergenic shampoo',
+        'Apply leave-in conditioner (if dry skin)',
+        'Express anal glands if needed (or vet visit)',
+        'Deep clean bedding, blankets, and crate',
+        'Replace worn grooming tools',
+      ],
+    },
+    {
+      title: 'SEASONAL',
+      color: C.amber,
+      bg: C.amberBg,
+      items: [
+        'Spring: Start allergy management protocol',
+        'Summer: Switch to cooling shampoo, increase wrinkle cleaning',
+        'Fall: Prepare moisturizing routine for dry air',
+        'Winter: Paw balm application before outdoor walks',
+      ],
+    },
+  ];
+
+  groomingSections.forEach((cls: { title: string; color: readonly [number, number, number]; bg: readonly [number, number, number]; items: string[] }) => {
+    ensureSpace(50);
+    doc.setFillColor(...cls.color);
+    doc.roundedRect(mx, y, 40, 8, 2, 2, 'F');
+    doc.setFontSize(7);
+    doc.setTextColor(...C.white);
+    doc.setFont('helvetica', 'bold');
+    doc.text(cls.title, mx + 20, y + 5.5, { align: 'center' });
+    y += 12;
+
+    cls.items.forEach((item) => {
+      drawCheckItem(item, cls.bg);
+    });
+    y += 4;
+  });
+
+  // Grooming supply checklist
+  ensureSpace(35);
+  doc.setFillColor(...C.accentBg);
+  doc.roundedRect(mx, y, contentW, 30, 3, 3, 'F');
+  doc.setDrawColor(...C.terracotta);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(mx, y, contentW, 30, 3, 3, 'S');
+  doc.setFontSize(9);
+  doc.setTextColor(...C.brown);
+  doc.setFont('helvetica', 'bold');
+  doc.text('ESSENTIAL GROOMING SUPPLIES', mx + 6, y + 7);
+  doc.setFontSize(7.5);
+  doc.setTextColor(...C.text);
+  doc.setFont('helvetica', 'normal');
+  const supplies = [
+    'Rubber curry brush  |  Hypoallergenic shampoo  |  Ear cleaning solution  |  Nail clippers/grinder',
+    'Enzymatic dog toothpaste + brush  |  Wrinkle wipes (unscented)  |  Paw balm  |  Styptic powder',
+    'Deshedding tool  |  Cotton balls  |  Leave-in conditioner  |  Grooming table (optional)',
+  ];
+  supplies.forEach((line, i) => {
+    doc.text(line, mx + 6, y + 14 + i * 5.5);
+  });
+
+  addFooter();
+
+  /* ═══════════════════════════════════════════════
+   * SEASONAL CARE CALENDAR PAGE
+   * ═══════════════════════════════════════════════ */
+  doc.addPage();
+  newPageBg();
+  y = 20;
+
+  drawPageTitle('Seasonal Care Calendar', C.emerald);
+
+  const seasonHalf = (contentW - 4) / 2;
+  const seasons = [
+    {
+      title: 'SPRING (Mar-May)',
+      color: C.emerald,
+      bg: C.emeraldBg,
+      items: [
+        'Begin flea/tick prevention',
+        'Schedule annual vet checkup',
+        'Update vaccinations',
+        'Allergy season prep: start antihistamines if prescribed',
+        'Increase outdoor walks (moderate temps)',
+        'Deep clean and swap winter bedding',
+        'Check for seasonal pollen allergies',
+      ],
+    },
+    {
+      title: 'SUMMER (Jun-Aug)',
+      color: C.orange,
+      bg: C.orangeBg,
+      items: [
+        'CRITICAL: Limit outdoor time to early AM/late PM',
+        'Provide cooling mat and shade at all times',
+        'Carry water on every walk -- offer every 10 min',
+        'Watch for heatstroke signs (heavy panting, drool)',
+        'Use cooling vest for temps above 70F',
+        'Increase wrinkle cleaning (moisture/sweat)',
+        'Test pavement temp before walks (5-sec hand test)',
+      ],
+    },
+    {
+      title: 'FALL (Sep-Nov)',
+      color: C.amber,
+      bg: C.amberBg,
+      items: [
+        'Transition to richer coat care (more brushing)',
+        'Schedule dental cleaning appointment',
+        'Adjust meal portions if activity decreases',
+        'Continue flea/tick prevention',
+        'Stock up on winter supplies (coat, boots, balm)',
+        'Seasonal allergy check (ragweed, mold)',
+        'Pre-winter vet wellness check',
+      ],
+    },
+    {
+      title: 'WINTER (Dec-Feb)',
+      color: C.sky,
+      bg: C.skyBg,
+      items: [
+        'Use warm coat/sweater for walks below 45F',
+        'Wipe paws after walks (salt/chemical removal)',
+        'Limit outdoor time in extreme cold',
+        'Add humidifier indoors (prevent dry skin)',
+        'Apply paw balm before and after walks',
+        'Maintain exercise with indoor play/puzzles',
+        'Watch for hypothermia signs (shivering, lethargy)',
+      ],
+    },
+  ];
+
+  // Draw 2x2 grid
+  for (let row = 0; row < 2; row++) {
+    const rowStartY = y;
+    for (let col = 0; col < 2; col++) {
+      const season = seasons[row * 2 + col];
+      const sx = mx + col * (seasonHalf + 4);
+      const blockY = rowStartY;
+
+      // Season header
+      doc.setFillColor(...season.color);
+      doc.roundedRect(sx, blockY, seasonHalf, 9, 2, 2, 'F');
+      doc.setFontSize(7);
+      doc.setTextColor(...C.white);
+      doc.setFont('helvetica', 'bold');
+      doc.text(season.title, sx + seasonHalf / 2, blockY + 6, { align: 'center' });
+
+      // Season items
+      let itemY = blockY + 12;
+      season.items.forEach((item) => {
+        doc.setFillColor(...season.bg);
+        doc.roundedRect(sx, itemY, seasonHalf, 7.5, 1, 1, 'F');
+        doc.setDrawColor(...C.border);
+        doc.setLineWidth(0.1);
+        doc.rect(sx + 3, itemY + 1.5, 4, 4, 'S');
+        doc.setFontSize(6.5);
+        doc.setTextColor(...C.text);
+        doc.setFont('helvetica', 'normal');
+        const itemText = doc.splitTextToSize(item, seasonHalf - 14);
+        doc.text(itemText[0], sx + 10, itemY + 5);
+        itemY += 8;
+      });
+    }
+    y = rowStartY + 12 + seasons[row * 2].items.length * 8 + 8;
+  }
+
+  // Monthly reminder
+  ensureSpace(20);
+  doc.setFillColor(...C.goldLight);
+  doc.roundedRect(mx, y, contentW, 14, 3, 3, 'F');
+  doc.setDrawColor(...C.gold);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(mx, y, contentW, 14, 3, 3, 'S');
+  doc.setFontSize(8);
+  doc.setTextColor(...C.brown);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PRO TIP: Set monthly calendar reminders for flea/tick treatment, nail trims, and weigh-ins.', mx + 6, y + 9);
+
+  addFooter();
+
+  /* ═══════════════════════════════════════════════
+   * VET VISIT PREP SHEETS PAGE
+   * ═══════════════════════════════════════════════ */
+  doc.addPage();
+  newPageBg();
+  y = 20;
+
+  drawPageTitle('Vet Visit Prep Sheets', C.sky);
+
+  // Life stage specific schedule
+  doc.setFontSize(11);
+  doc.setTextColor(...C.brown);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Recommended Schedule: ${stageLabel(answers.lifeStage)} Frenchie`, mx, y + 4);
+  y += 10;
+
+  const vetSchedule = answers.lifeStage === 'puppy'
+    ? [
+        ['8 Weeks', 'DHPP #1, deworming, fecal test', 'Weight, growth rate, conformation'],
+        ['12 Weeks', 'DHPP #2, bordetella, deworming', 'Socialization review, bite check'],
+        ['16 Weeks', 'DHPP #3, rabies vaccine', 'BOAS baseline assessment'],
+        ['6 Months', 'Spay/neuter consult, bloodwork', 'Dental check, growth plate review'],
+        ['12 Months', 'Full wellness exam, titers', 'Adult diet transition plan'],
+      ]
+    : answers.lifeStage === 'senior'
+    ? [
+        ['Every 6 months', 'Full bloodwork + urinalysis', 'Kidney, liver, thyroid function'],
+        ['Annual', 'Dental cleaning under anesthesia', 'Discuss BOAS protocol for anesthesia'],
+        ['Annual', 'Cardiac evaluation / ECG', 'Check for age-related heart changes'],
+        ['Bi-annual', 'Joint assessment & mobility check', 'IVDD screening, pain management'],
+        ['As needed', 'Lump/bump biopsy', 'Any new growth should be checked'],
+      ]
+    : [
+        ['Every 6 months', 'Wellness exam + weight check', 'Body condition score assessment'],
+        ['Annual', 'DHPP/rabies boosters (or titers)', 'Discuss any behavior changes'],
+        ['Annual', 'Dental exam (cleaning if needed)', 'Full oral health assessment'],
+        ['Annual', 'Full bloodwork panel', 'Baseline for future comparison'],
+        ['As needed', 'Skin/allergy consultation', 'If chronic scratching, hot spots, etc.'],
+      ];
+
+  drawTable(
+    ['When', 'Procedures', 'Notes'],
+    vetSchedule,
+    [34, 62, contentW - 96 > 40 ? contentW - 96 : 40],
+    C.sky
+  );
+
+  // Pre-visit checklist
+  y += 4;
+  doc.setFontSize(11);
+  doc.setTextColor(...C.brown);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Pre-Visit Checklist', mx, y + 4);
+  y += 10;
+
+  const preVisitItems = [
+    'Write down all questions/concerns in advance',
+    'Bring current food label (photo is fine)',
+    'Note any changes in appetite, energy, or behavior',
+    'List all supplements and medications with dosages',
+    'Bring stool sample if requested (fresh, within 12 hrs)',
+    'Note last flea/tick/heartworm treatment date',
+    "Bring your Frenchie's weight history (if tracking)",
+    'Have vaccination records accessible (digital or paper)',
+  ];
+
+  preVisitItems.forEach((item) => {
+    drawCheckItem(item, C.skyBg);
+  });
+
+  // Questions to ask your vet
+  y += 6;
+  ensureSpace(55);
+  doc.setFillColor(...C.white);
+  doc.roundedRect(mx, y, contentW, 50, 3, 3, 'F');
+  doc.setDrawColor(...C.sky);
+  doc.setLineWidth(0.4);
+  doc.roundedRect(mx, y, contentW, 50, 3, 3, 'S');
+  doc.setFillColor(...C.sky);
+  doc.roundedRect(mx, y, 3, 50, 1, 1, 'F');
+
+  doc.setFontSize(9);
+  doc.setTextColor(...C.sky);
+  doc.setFont('helvetica', 'bold');
+  doc.text('QUESTIONS TO ASK YOUR VET', mx + 8, y + 7);
+
+  const vetQuestions = [
+    `1. Is my Frenchie at a healthy weight? (Currently scored ${answers.bodyCondition}/9)`,
+    '2. Should we adjust the current diet or supplements?',
+    '3. Are all vaccinations up to date, or should we do titers?',
+    '4. Any breed-specific screenings recommended at this age?',
+    '5. Should we evaluate BOAS severity or discuss surgery?',
+    '6. What dental care schedule do you recommend?',
+    '7. Are there any concerns based on today\'s exam?',
+    '8. When should we schedule the next visit?',
+  ];
+
+  doc.setFontSize(7.5);
+  doc.setTextColor(...C.text);
+  doc.setFont('helvetica', 'normal');
+  vetQuestions.forEach((q, i) => {
+    doc.text(q, mx + 8, y + 14 + i * 4.5);
+  });
+
+  // Post-visit notes area
+  y += 56;
+  ensureSpace(28);
+  doc.setFillColor(...C.offWhite);
+  doc.roundedRect(mx, y, contentW, 24, 3, 3, 'F');
+  doc.setDrawColor(...C.border);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(mx, y, contentW, 24, 3, 3, 'S');
+  doc.setFontSize(8);
+  doc.setTextColor(...C.brown);
+  doc.setFont('helvetica', 'bold');
+  doc.text('POST-VISIT NOTES:', mx + 5, y + 7);
+  // Lined area for writing
+  doc.setDrawColor(...C.lightGray);
+  doc.setLineWidth(0.15);
+  for (let lineY = y + 12; lineY < y + 22; lineY += 5) {
+    doc.line(mx + 5, lineY, pw - mx - 5, lineY);
+  }
+
+  addFooter();
+
+  /* ═══════════════════════════════════════════════
    * WEEKLY CARE CHECKLIST PAGE
    * ═══════════════════════════════════════════════ */
   doc.addPage();
   newPageBg();
   y = 20;
 
-  doc.setFontSize(18);
-  doc.setTextColor(...C.brown);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Weekly Care Checklist', mx, y + 5);
-  y += 12;
-  doc.setDrawColor(...C.terracotta);
-  doc.setLineWidth(0.8);
-  doc.line(mx, y, mx + 45, y);
-  y += 10;
+  drawPageTitle('Weekly Care Checklist');
 
-  const checklistSections: { title: string; color: readonly [number, number, number]; bg: readonly [number, number, number]; items: string[] }[] = [
+  const checklistSections = [
     {
       title: 'DAILY',
       color: C.emerald,
@@ -485,9 +1060,8 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
     },
   ];
 
-  checklistSections.forEach((cls) => {
+  checklistSections.forEach((cls: { title: string; color: readonly [number, number, number]; bg: readonly [number, number, number]; items: string[] }) => {
     ensureSpace(50);
-    // Section label
     doc.setFillColor(...cls.color);
     doc.roundedRect(mx, y, 32, 8, 2, 2, 'F');
     doc.setFontSize(7);
@@ -497,19 +1071,7 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
     y += 12;
 
     cls.items.forEach((item) => {
-      ensureSpace(10);
-      // Checkbox
-      doc.setFillColor(...cls.bg);
-      doc.roundedRect(mx, y, contentW, 8, 1.5, 1.5, 'F');
-      doc.setDrawColor(...C.border);
-      doc.setLineWidth(0.2);
-      doc.rect(mx + 4, y + 1.5, 5, 5, 'S');
-
-      doc.setFontSize(8);
-      doc.setTextColor(...C.text);
-      doc.setFont('helvetica', 'normal');
-      doc.text(stripEmoji(item), mx + 13, y + 5.5);
-      y += 9;
+      drawCheckItem(item, cls.bg);
     });
     y += 4;
   });
@@ -523,15 +1085,7 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   newPageBg();
   y = 20;
 
-  doc.setFontSize(18);
-  doc.setTextColor(...C.brown);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Emergency Quick Reference', mx, y + 5);
-  y += 12;
-  doc.setDrawColor(...C.rose);
-  doc.setLineWidth(0.8);
-  doc.line(mx, y, mx + 45, y);
-  y += 10;
+  drawPageTitle('Emergency Quick Reference', C.rose);
 
   const emergencies = [
     { title: 'Heatstroke', signs: 'Heavy panting, drooling, vomiting, wobbly gait', action: 'Move to shade/AC immediately. Apply cool (not cold) water to paws and belly. Rush to vet.' },
@@ -539,6 +1093,7 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
     { title: 'Allergic Reaction', signs: 'Swollen face/eyes, hives, difficulty breathing', action: 'Remove allergen if known. Benadryl (1mg/lb) if mild. Emergency vet if breathing is affected.' },
     { title: 'Seizure', signs: 'Uncontrolled shaking, loss of consciousness, drooling', action: 'Do NOT restrain. Clear area of hazards. Time the seizure. Vet visit within 24 hours; emergency if > 3 min.' },
     { title: 'Poisoning', signs: 'Vomiting, diarrhea, lethargy, tremors', action: 'Note what was ingested. Call ASPCA Poison Control: (888) 426-4435. Do NOT induce vomiting unless directed.' },
+    { title: 'IVDD / Back Injury', signs: 'Yelping when touched, reluctance to move, dragging legs', action: 'Restrict movement immediately. Carry (do not let walk). Emergency vet -- possible spinal emergency.' },
   ];
 
   emergencies.forEach((em) => {
@@ -574,20 +1129,21 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
 
   // Emergency contacts
   y += 4;
-  ensureSpace(20);
+  ensureSpace(22);
   doc.setFillColor(...C.white);
-  doc.roundedRect(mx, y, contentW, 16, 3, 3, 'F');
+  doc.roundedRect(mx, y, contentW, 20, 3, 3, 'F');
   doc.setDrawColor(...C.rose);
   doc.setLineWidth(0.3);
-  doc.roundedRect(mx, y, contentW, 16, 3, 3, 'S');
+  doc.roundedRect(mx, y, contentW, 20, 3, 3, 'S');
   doc.setFontSize(8);
   doc.setTextColor(...C.brown);
   doc.setFont('helvetica', 'bold');
-  doc.text('EMERGENCY CONTACTS', mx + 5, y + 6);
+  doc.text('EMERGENCY CONTACTS -- FILL IN AND KEEP ACCESSIBLE', mx + 5, y + 6);
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...C.text);
-  doc.text('ASPCA Poison Control: (888) 426-4435  |  Your Vet: _______________  |  Emergency Vet: _______________', mx + 5, y + 12);
+  doc.text('ASPCA Poison Control: (888) 426-4435', mx + 5, y + 12);
+  doc.text('Your Vet: _______________________________  |  Emergency Vet: _______________________________', mx + 5, y + 17);
 
   addFooter();
 
@@ -598,21 +1154,13 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   newPageBg();
   y = 20;
 
-  doc.setFontSize(18);
-  doc.setTextColor(...C.brown);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Helpful Resources', mx, y + 5);
-  y += 12;
-  doc.setDrawColor(...C.terracotta);
-  doc.setLineWidth(0.8);
-  doc.line(mx, y, mx + 45, y);
-  y += 12;
+  drawPageTitle('Helpful Resources');
 
   const resources = [
     { title: 'Healthy Treats Guide', desc: 'Discover safe, nutritious treats your Frenchie will love -- including portion guidelines and homemade recipes.', url: 'frenchyfab.com/french-bulldog-healthy-treats' },
     { title: 'Complete Grooming Blueprint', desc: 'Step-by-step grooming routines tailored for French Bulldogs, from wrinkle care to nail trimming.', url: 'frenchyfab.com/french-bulldog-grooming-blueprint/' },
     { title: 'Essential Supplements Guide', desc: 'Evidence-based supplement recommendations from puppy to senior -- including dosages and top brands.', url: 'frenchyfab.com/essential-nutritional-supplements-french-bulldogs/' },
-    { title: 'Best Harness for Pulling', desc: 'Expert-reviewed harness picks that prevent pulling and protect your Frenchie\'s delicate airway.', url: 'frenchyfab.com/best-harness-for-french-bulldog-that-pulls/' },
+    { title: 'Best Harness for Pulling', desc: "Expert-reviewed harness picks that prevent pulling and protect your Frenchie's delicate airway.", url: 'frenchyfab.com/best-harness-for-french-bulldog-that-pulls/' },
   ];
 
   resources.forEach((res) => {
@@ -642,33 +1190,24 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
     y += 28;
   });
 
-  // Premium upsell
+  // Lifetime updates badge
   y += 8;
-  ensureSpace(42);
-  doc.setFillColor(...C.goldLight);
-  doc.roundedRect(mx, y, contentW, 38, 4, 4, 'F');
-  doc.setDrawColor(...C.gold);
-  doc.setLineWidth(0.5);
-  doc.roundedRect(mx, y, contentW, 38, 4, 4, 'S');
-
-  doc.setFontSize(12);
-  doc.setTextColor(...C.brown);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Want Even More? Get the Premium Care Guide', pw / 2, y + 10, { align: 'center' });
-
-  doc.setFontSize(8);
-  doc.setTextColor(...C.text);
-  doc.setFont('helvetica', 'normal');
-  const premiumDesc = doc.splitTextToSize(
-    'Our 12-page Premium PDF includes custom feeding charts, seasonal grooming checklists, vet visit prep sheets, emergency protocols, and breed-specific health screening timelines -- all personalized for your Frenchie.',
-    contentW - 20
-  );
-  doc.text(premiumDesc, pw / 2, y + 17, { align: 'center' });
+  ensureSpace(26);
+  doc.setFillColor(...C.emeraldBg);
+  doc.roundedRect(mx, y, contentW, 22, 4, 4, 'F');
+  doc.setDrawColor(...C.emerald);
+  doc.setLineWidth(0.4);
+  doc.roundedRect(mx, y, contentW, 22, 4, 4, 'S');
 
   doc.setFontSize(10);
-  doc.setTextColor(...C.terracotta);
+  doc.setTextColor(...C.emerald);
   doc.setFont('helvetica', 'bold');
-  doc.text('Get it now for just $7.99 at frenchyfab.com', pw / 2, y + 33, { align: 'center' });
+  doc.text('LIFETIME UPDATES INCLUDED', pw / 2, y + 8, { align: 'center' });
+  doc.setFontSize(7.5);
+  doc.setTextColor(...C.text);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Your premium plan includes free updates as our veterinary advisors add new recommendations.', pw / 2, y + 15, { align: 'center' });
+  doc.text('Re-take the quiz anytime at frenchyfab.com to get refreshed, up-to-date guidance.', pw / 2, y + 20, { align: 'center' });
 
   addFooter();
 
@@ -709,7 +1248,14 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   doc.setFont('helvetica', 'normal');
   doc.text('Follow us for daily Frenchie tips and community stories', pw / 2, ph / 2 + 22, { align: 'center' });
 
-  // Footer
+  // Lifetime updates reminder
+  doc.setFillColor(...C.goldLight);
+  doc.roundedRect(mx + 20, ph / 2 + 32, contentW - 40, 16, 3, 3, 'F');
+  doc.setFontSize(8);
+  doc.setTextColor(...C.brown);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Lifetime Updates Included -- Re-take the quiz anytime for fresh recommendations', pw / 2, ph / 2 + 42, { align: 'center' });
+
   doc.setDrawColor(...C.border);
   doc.setLineWidth(0.3);
   doc.line(mx, ph - 14, pw - mx, ph - 14);
