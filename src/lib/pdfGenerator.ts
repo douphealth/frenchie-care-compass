@@ -30,10 +30,10 @@ const C = {
   violetBg:   [245, 240, 255] as const,
   rose:       [220, 80, 100]  as const,
   roseBg:     [255, 240, 242] as const,
-  amber:      [200, 140, 40]  as const,
-  amberBg:    [255, 248, 230] as const,
-  teal:       [40, 145, 135]  as const,
-  tealBg:     [232, 248, 245] as const,
+  amber:      [200, 140, 40]  as const as readonly [number, number, number],
+  amberBg:    [255, 248, 230] as const as readonly [number, number, number],
+  teal:       [40, 145, 135]  as const as readonly [number, number, number],
+  tealBg:     [232, 248, 245] as const as readonly [number, number, number],
 };
 
 const SECTION_COLORS: Record<number, { accent: readonly [number, number, number]; bg: readonly [number, number, number] }> = {
