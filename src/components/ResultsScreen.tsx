@@ -26,8 +26,8 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
     }
   };
 
-  const handleDownloadPDF = () => {
-    generatePDF(plan, answers);
+  const handleDownloadPDF = async () => {
+    await generatePDF(plan, answers);
   };
 
   return (

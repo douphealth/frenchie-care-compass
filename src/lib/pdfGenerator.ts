@@ -1,7 +1,20 @@
 import jsPDF from 'jspdf';
 import { PlanSection } from './planGenerator';
 import { QuizAnswers } from './quizData';
+import frenchieHeroUrl from '@/assets/frenchie-hero.png';
+import frenchieFaceUrl from '@/assets/frenchie-face.png';
+import pawIconUrl from '@/assets/paw-icon.png';
 
+/* ── Image loader helper ── */
+async function loadImageAsBase64(url: string): Promise<string> {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.readAsDataURL(blob);
+  });
+}
 /* ── Brand Palette (RGB) ── */
 const C = {
   cream:      [250, 245, 235] as const,
@@ -108,7 +121,14 @@ function getPortionPerMeal(w: string, stage: string, bc: number): { cups: string
   };
 }
 
-export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
+export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Promise<void> {
+  // Load images
+  const [heroImg, faceImg, pawImg] = await Promise.all([
+    loadImageAsBase64(frenchieHeroUrl),
+    loadImageAsBase64(frenchieFaceUrl),
+    loadImageAsBase64(pawIconUrl),
+  ]);
+
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pw = 210, ph = 297, mx = 16, contentW = pw - mx * 2;
   let y = 0;
@@ -141,10 +161,14 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   };
 
   const drawPageTitle = (title: string, accentColor: readonly [number, number, number] = C.terracotta) => {
+    // Add small paw icon next to title
+    try {
+      doc.addImage(pawImg, 'PNG', mx, y - 2, 8, 8);
+    } catch (e) { /* fallback */ }
     doc.setFontSize(18);
     doc.setTextColor(...C.brown);
     doc.setFont('helvetica', 'bold');
-    doc.text(title, mx, y + 5);
+    doc.text(title, mx + 10, y + 5);
     y += 12;
     doc.setDrawColor(...accentColor);
     doc.setLineWidth(0.8);
@@ -299,29 +323,38 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   newPageBg();
 
   doc.setFillColor(...C.brown);
-  doc.rect(0, 0, pw, 100, 'F');
+  doc.rect(0, 0, pw, 105, 'F');
+
+  // Decorative gold accents
   doc.setFillColor(...C.gold);
-  doc.rect(0, 100, pw, 2, 'F');
+  doc.rect(0, 105, pw, 2.5, 'F');
+  doc.setFillColor(...C.terracotta);
+  doc.rect(0, 107.5, pw, 1, 'F');
 
   doc.setFontSize(12);
   doc.setTextColor(...C.goldLight);
   doc.setFont('helvetica', 'bold');
-  doc.text('FRENCHYFAB', pw / 2, 28, { align: 'center' });
+  doc.text('FRENCHYFAB', pw / 2, 22, { align: 'center' });
 
   doc.setDrawColor(...C.gold);
   doc.setLineWidth(0.5);
-  doc.line(pw / 2 - 20, 33, pw / 2 + 20, 33);
+  doc.line(pw / 2 - 20, 26, pw / 2 + 20, 26);
 
   doc.setFontSize(28);
   doc.setTextColor(...C.white);
   doc.setFont('helvetica', 'bold');
-  doc.text('Your Personalized', pw / 2, 55, { align: 'center' });
-  doc.text('Frenchie Care Plan', pw / 2, 68, { align: 'center' });
+  doc.text('Your Personalized', pw / 2, 42, { align: 'center' });
+  doc.text('Frenchie Care Plan', pw / 2, 56, { align: 'center' });
 
   doc.setFontSize(10);
   doc.setTextColor(...C.goldLight);
   doc.setFont('helvetica', 'normal');
-  doc.text('Science-Backed Recommendations for a Happier, Healthier French Bulldog', pw / 2, 85, { align: 'center' });
+  doc.text('Science-Backed Recommendations for a Happier, Healthier French Bulldog', pw / 2, 72, { align: 'center' });
+
+  // Hero Frenchie image on cover (centered, below header)
+  try {
+    doc.addImage(heroImg, 'PNG', pw / 2 - 25, 78, 50, 50);
+  } catch (e) { /* graceful fallback if image fails */ }
 
   // Profile card
   const cardY = 118;
@@ -1224,10 +1257,15 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   doc.setFillColor(...C.gold);
   doc.rect(0, ph - 5.5, pw, 1.5, 'F');
 
+  // Frenchie face image centered
+  try {
+    doc.addImage(faceImg, 'PNG', pw / 2 - 22, ph / 2 - 70, 44, 44);
+  } catch (e) { /* graceful fallback */ }
+
   doc.setFontSize(22);
   doc.setTextColor(...C.brown);
   doc.setFont('helvetica', 'bold');
-  doc.text('Thank You!', pw / 2, ph / 2 - 35, { align: 'center' });
+  doc.text('Thank You!', pw / 2, ph / 2 - 15, { align: 'center' });
 
   doc.setFontSize(11);
   doc.setTextColor(...C.text);
@@ -1236,17 +1274,17 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
     'This care plan was generated specifically for your French Bulldog based on the information you provided. For more tips, guides, and breed-specific advice, visit us online.',
     contentW - 30
   );
-  doc.text(thankLines, pw / 2, ph / 2 - 18, { align: 'center' });
+  doc.text(thankLines, pw / 2, ph / 2 + 2, { align: 'center' });
 
   doc.setFontSize(14);
   doc.setTextColor(...C.terracotta);
   doc.setFont('helvetica', 'bold');
-  doc.text('frenchyfab.com', pw / 2, ph / 2 + 10, { align: 'center' });
+  doc.text('frenchyfab.com', pw / 2, ph / 2 + 28, { align: 'center' });
 
   doc.setFontSize(9);
   doc.setTextColor(...C.textMuted);
   doc.setFont('helvetica', 'normal');
-  doc.text('Follow us for daily Frenchie tips and community stories', pw / 2, ph / 2 + 22, { align: 'center' });
+  doc.text('Follow us for daily Frenchie tips and community stories', pw / 2, ph / 2 + 38, { align: 'center' });
 
   // Lifetime updates reminder
   doc.setFillColor(...C.goldLight);
