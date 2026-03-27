@@ -372,7 +372,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
 
   // Hero Frenchie image on cover (centered, below header)
   try {
-    doc.addImage(heroImg, 'PNG', pw / 2 - 25, 78, 50, 50);
+    doc.addImage(heroImg, 'JPEG', pw / 2 - 25, 78, 50, 50);
   } catch (e) { /* graceful fallback if image fails */ }
 
   // Profile card
