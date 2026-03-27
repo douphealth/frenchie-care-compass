@@ -443,7 +443,7 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
   doc.line(mx, y, mx + 45, y);
   y += 10;
 
-  const checklistSections = [
+  const checklistSections: { title: string; color: readonly [number, number, number]; bg: readonly [number, number, number]; items: string[] }[] = [
     {
       title: 'DAILY',
       color: C.emerald,
