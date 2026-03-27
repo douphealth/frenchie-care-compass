@@ -121,7 +121,14 @@ function getPortionPerMeal(w: string, stage: string, bc: number): { cups: string
   };
 }
 
-export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
+export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Promise<void> {
+  // Load images
+  const [heroImg, faceImg, pawImg] = await Promise.all([
+    loadImageAsBase64(frenchieHeroUrl),
+    loadImageAsBase64(frenchieFaceUrl),
+    loadImageAsBase64(pawIconUrl),
+  ]);
+
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pw = 210, ph = 297, mx = 16, contentW = pw - mx * 2;
   let y = 0;
