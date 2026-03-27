@@ -1278,7 +1278,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
 
   // Frenchie face image centered
   try {
-    doc.addImage(faceImg, 'PNG', pw / 2 - 22, ph / 2 - 70, 44, 44);
+    doc.addImage(faceImg, 'JPEG', pw / 2 - 22, ph / 2 - 70, 44, 44);
   } catch (e) { /* graceful fallback */ }
 
   doc.setFontSize(22);
