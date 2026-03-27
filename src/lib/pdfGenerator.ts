@@ -5,14 +5,24 @@ import frenchieHeroUrl from '@/assets/frenchie-hero.png';
 import frenchieFaceUrl from '@/assets/frenchie-face.png';
 import pawIconUrl from '@/assets/paw-icon.png';
 
-/* ── Image loader helper ── */
-async function loadImageAsBase64(url: string): Promise<string> {
+/* ── Image loader helper (compressed JPEG) ── */
+async function loadImageAsBase64(url: string, maxWidth = 300, quality = 0.6): Promise<string> {
   const response = await fetch(url);
   const blob = await response.blob();
   return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
-    reader.readAsDataURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src = URL.createObjectURL(blob);
   });
 }
 /* ── Brand Palette (RGB) ── */
@@ -91,6 +101,15 @@ function stripEmoji(str: string): string {
     .replace(/\u2013/g, '-')
     .replace(/\u2014/g, '--')
     .replace(/\u2026/g, '...')
+    .replace(/\u00BC/g, '1/4')
+    .replace(/\u00BD/g, '1/2')
+    .replace(/\u00BE/g, '3/4')
+    .replace(/\u2153/g, '1/3')
+    .replace(/\u2154/g, '2/3')
+    .replace(/\u215B/g, '1/8')
+    .replace(/\u215C/g, '3/8')
+    .replace(/\u215D/g, '5/8')
+    .replace(/\u215E/g, '7/8')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
@@ -163,7 +182,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   const drawPageTitle = (title: string, accentColor: readonly [number, number, number] = C.terracotta) => {
     // Add small paw icon next to title
     try {
-      doc.addImage(pawImg, 'PNG', mx, y - 2, 8, 8);
+      doc.addImage(pawImg, 'JPEG', mx, y - 2, 8, 8);
     } catch (e) { /* fallback */ }
     doc.setFontSize(18);
     doc.setTextColor(...C.brown);
@@ -353,7 +372,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
 
   // Hero Frenchie image on cover (centered, below header)
   try {
-    doc.addImage(heroImg, 'PNG', pw / 2 - 25, 78, 50, 50);
+    doc.addImage(heroImg, 'JPEG', pw / 2 - 25, 78, 50, 50);
   } catch (e) { /* graceful fallback if image fails */ }
 
   // Profile card
@@ -1259,7 +1278,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
 
   // Frenchie face image centered
   try {
-    doc.addImage(faceImg, 'PNG', pw / 2 - 22, ph / 2 - 70, 44, 44);
+    doc.addImage(faceImg, 'JPEG', pw / 2 - 22, ph / 2 - 70, 44, 44);
   } catch (e) { /* graceful fallback */ }
 
   doc.setFontSize(22);
