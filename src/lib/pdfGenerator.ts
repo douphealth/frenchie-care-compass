@@ -1060,7 +1060,7 @@ export function generatePDF(plan: PlanSection[], answers: QuizAnswers): void {
     },
   ];
 
-  checklistSections.forEach((cls) => {
+  checklistSections.forEach((cls: { title: string; color: readonly [number, number, number]; bg: readonly [number, number, number]; items: string[] }) => {
     ensureSpace(50);
     doc.setFillColor(...cls.color);
     doc.roundedRect(mx, y, 32, 8, 2, 2, 'F');
