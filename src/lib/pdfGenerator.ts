@@ -1253,10 +1253,15 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   doc.setFillColor(...C.gold);
   doc.rect(0, ph - 5.5, pw, 1.5, 'F');
 
+  // Frenchie face image centered
+  try {
+    doc.addImage(faceImg, 'PNG', pw / 2 - 22, ph / 2 - 70, 44, 44);
+  } catch (e) { /* graceful fallback */ }
+
   doc.setFontSize(22);
   doc.setTextColor(...C.brown);
   doc.setFont('helvetica', 'bold');
-  doc.text('Thank You!', pw / 2, ph / 2 - 35, { align: 'center' });
+  doc.text('Thank You!', pw / 2, ph / 2 - 15, { align: 'center' });
 
   doc.setFontSize(11);
   doc.setTextColor(...C.text);
@@ -1265,17 +1270,17 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
     'This care plan was generated specifically for your French Bulldog based on the information you provided. For more tips, guides, and breed-specific advice, visit us online.',
     contentW - 30
   );
-  doc.text(thankLines, pw / 2, ph / 2 - 18, { align: 'center' });
+  doc.text(thankLines, pw / 2, ph / 2 + 2, { align: 'center' });
 
   doc.setFontSize(14);
   doc.setTextColor(...C.terracotta);
   doc.setFont('helvetica', 'bold');
-  doc.text('frenchyfab.com', pw / 2, ph / 2 + 10, { align: 'center' });
+  doc.text('frenchyfab.com', pw / 2, ph / 2 + 28, { align: 'center' });
 
   doc.setFontSize(9);
   doc.setTextColor(...C.textMuted);
   doc.setFont('helvetica', 'normal');
-  doc.text('Follow us for daily Frenchie tips and community stories', pw / 2, ph / 2 + 22, { align: 'center' });
+  doc.text('Follow us for daily Frenchie tips and community stories', pw / 2, ph / 2 + 38, { align: 'center' });
 
   // Lifetime updates reminder
   doc.setFillColor(...C.goldLight);
