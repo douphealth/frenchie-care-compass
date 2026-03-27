@@ -101,6 +101,15 @@ function stripEmoji(str: string): string {
     .replace(/\u2013/g, '-')
     .replace(/\u2014/g, '--')
     .replace(/\u2026/g, '...')
+    .replace(/\u00BC/g, '1/4')
+    .replace(/\u00BD/g, '1/2')
+    .replace(/\u00BE/g, '3/4')
+    .replace(/\u2153/g, '1/3')
+    .replace(/\u2154/g, '2/3')
+    .replace(/\u215B/g, '1/8')
+    .replace(/\u215C/g, '3/8')
+    .replace(/\u215D/g, '5/8')
+    .replace(/\u215E/g, '7/8')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
