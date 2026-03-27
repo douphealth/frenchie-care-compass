@@ -184,6 +184,12 @@ const PremiumUpsell = ({ onSkip }: Props) => {
             )}
             {loading ? 'Opening checkout...' : 'Get Premium PDF — $7.99'}
           </Button>
+          <div className="flex items-center justify-center gap-2 mt-3 py-2 px-4 rounded-lg bg-emerald-50 border border-emerald-200/50">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            <p className="text-xs font-bold text-emerald-700">
+              100% Money-Back Guarantee — No questions asked
+            </p>
+          </div>
           <p className="text-center text-xs text-muted-foreground mt-2">
             One-time payment · Instant download · No subscription
           </p>

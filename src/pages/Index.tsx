@@ -6,6 +6,7 @@ import EmailGate from '@/components/EmailGate';
 import ResultsScreen from '@/components/ResultsScreen';
 import PremiumUpsell from '@/components/PremiumUpsell';
 import LoadingScreen from '@/components/LoadingScreen';
+import ExitIntentPopup from '@/components/ExitIntentPopup';
 import { quizSteps, QuizAnswers } from '@/lib/quizData';
 import { generatePlan, PlanSection } from '@/lib/planGenerator';
 import { supabase } from '@/integrations/supabase/client';
