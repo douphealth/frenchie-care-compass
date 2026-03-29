@@ -63,11 +63,11 @@ const LandingHero = ({ onStart }: Props) => (
       >
         <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-foreground leading-tight font-display">
           Get Your Frenchie's{' '}
-          <span className="text-gradient">Custom Care Plan</span>{' '}
-          in 60 Seconds
+          <span className="text-gradient">Personalized Care Plan</span>{' '}
+          in Under 2 Minutes
         </h1>
         <p className="text-muted-foreground text-sm md:text-base leading-relaxed max-w-md mx-auto">
-          Answer 5 quick questions and get a breed-specific routine covering feeding, exercise, grooming, skin, and health watchouts — tailored to your French Bulldog's age, lifestyle, and needs.
+          Build a breed-specific routine for feeding, exercise, skin care, heat safety, and health watchouts — based on your French Bulldog's age, lifestyle, and needs.
         </p>
       </motion.div>
 
