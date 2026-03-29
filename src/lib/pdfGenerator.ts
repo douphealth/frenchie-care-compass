@@ -5,8 +5,8 @@ import frenchieHeroUrl from '@/assets/frenchie-hero.png';
 import frenchieFaceUrl from '@/assets/frenchie-face.png';
 import pawIconUrl from '@/assets/paw-icon.png';
 
-/* ── Image loader helper (compressed JPEG) ── */
-async function loadImageAsBase64(url: string, maxWidth = 300, quality = 0.6): Promise<string> {
+/* ── Image loader helper (compressed JPEG with white fill for transparency) ── */
+async function loadImageAsBase64(url: string, maxWidth = 400, quality = 0.7): Promise<string> {
   const response = await fetch(url);
   const blob = await response.blob();
   return new Promise((resolve) => {
@@ -19,6 +19,9 @@ async function loadImageAsBase64(url: string, maxWidth = 300, quality = 0.6): Pr
       canvas.width = w;
       canvas.height = h;
       const ctx = canvas.getContext('2d')!;
+      // Fill with cream/white background to prevent black on transparent PNGs
+      ctx.fillStyle = '#FAF5EB';
+      ctx.fillRect(0, 0, w, h);
       ctx.drawImage(img, 0, 0, w, h);
       resolve(canvas.toDataURL('image/jpeg', quality));
     };
