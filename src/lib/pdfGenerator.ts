@@ -166,8 +166,9 @@ function getPortionPerMeal(w: string, stage: string, bc: number): { cups: string
 }
 
 export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Promise<void> {
-  // Load images
-  const [heroImg, faceImg, pawImg] = await Promise.all([
+  // Load images — hero as PNG (transparent, for dark cover bg), others as JPEG
+  const [heroImgPng, heroImg, faceImg, pawImg] = await Promise.all([
+    loadImageAsPng(frenchieHeroUrl, 400),
     loadImageAsBase64(frenchieHeroUrl),
     loadImageAsBase64(frenchieFaceUrl),
     loadImageAsBase64(pawIconUrl),
