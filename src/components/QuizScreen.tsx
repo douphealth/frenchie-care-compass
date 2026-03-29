@@ -78,19 +78,19 @@ const QuizScreen = ({ step, answers, onAnswer, onSliderChange, onNext, onBack, c
         </AnimatePresence>
       </div>
 
-      {/* Next */}
+      {/* Next — sticky bottom */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="mt-6"
+        className="sticky bottom-0 pt-4 pb-2 bg-gradient-to-t from-background via-background to-transparent -mx-5 px-5"
       >
         <Button
           onClick={onNext}
           disabled={!canProceed}
           className="w-full h-13 rounded-2xl font-black text-base gap-2 premium-gradient text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-40"
         >
-          {step === quizSteps.length - 1 ? 'See My Plan ✨' : 'Next'}
+          {step === quizSteps.length - 1 ? 'See My Plan' : 'Next'}
           <ArrowRight className="w-4 h-4" />
         </Button>
       </motion.div>
