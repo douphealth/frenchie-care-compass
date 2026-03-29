@@ -28,6 +28,28 @@ async function loadImageAsBase64(url: string, maxWidth = 400, quality = 0.7): Pr
     img.src = URL.createObjectURL(blob);
   });
 }
+
+/* Load image as PNG (preserves transparency) for use on dark backgrounds */
+async function loadImageAsPng(url: string, maxWidth = 400): Promise<string> {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+      // No background fill — keep transparency
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.src = URL.createObjectURL(blob);
+  });
+}
 /* ── Brand Palette (RGB) ── */
 const C = {
   cream:      [250, 245, 235] as const,
