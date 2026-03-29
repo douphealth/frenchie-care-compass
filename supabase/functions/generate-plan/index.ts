@@ -66,7 +66,8 @@ CONDITIONAL SECTIONS:
 - If concern is "wellness": add icon: "WELLNESS", title: "Preventive Wellness Checklist"
 
 QUALITY STANDARDS:
-- Each section MUST have 6-8 detailed recommendations
+- Each section MUST have exactly 5 detailed recommendations (no more, no less)
+- Keep each recommendation to 2 sentences maximum
 - Every calorie/portion number must be mathematically derived from the dog's weight and life stage
 - Supplement dosages must be weight-appropriate (mg per kg or per lb)
 - Exercise recommendations must account for brachycephalic airway compromise
