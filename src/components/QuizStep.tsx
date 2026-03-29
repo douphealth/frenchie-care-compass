@@ -1,9 +1,9 @@
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
-import { Check } from 'lucide-react';
+import { Check, Info } from 'lucide-react';
 
-type Option = { value: string; label: string; description: string };
+type Option = { value: string; label: string; description: string; hint?: string };
 
 type Props = {
   question: string;
@@ -41,7 +41,6 @@ const QuizStep = ({
   const isSelected = (value: string) =>
     type === 'single' ? selected === value : (Array.isArray(selected) && selected.includes(value));
 
-  // Split emoji from label text
   const getEmoji = (label: string) => {
     const parts = label.split(' ');
     return { emoji: parts[0], text: parts.slice(1).join(' ') };
@@ -86,6 +85,12 @@ const QuizStep = ({
               <div className="flex-1 min-w-0">
                 <div className="font-bold text-foreground text-sm md:text-base">{text}</div>
                 <div className="text-xs text-muted-foreground mt-0.5">{opt.description}</div>
+                {opt.hint && (
+                  <div className="flex items-center gap-1 mt-1.5 text-[11px] text-secondary/80 font-semibold">
+                    <Info className="w-3 h-3 shrink-0" />
+                    <span>{opt.hint}</span>
+                  </div>
+                )}
               </div>
               <motion.div
                 initial={false}

@@ -6,12 +6,14 @@ const features = [
   { name: 'Feeding recommendations', free: true, premium: true },
   { name: 'Grooming routine', free: true, premium: true },
   { name: 'Exercise guidelines', free: true, premium: true },
-  { name: 'Custom feeding charts with portions', free: false, premium: true },
+  { name: 'Custom feeding charts & portions', free: false, premium: true },
   { name: 'Printable grooming checklist', free: false, premium: true },
   { name: 'Seasonal care calendar', free: false, premium: true },
   { name: 'Vet visit prep sheets', free: false, premium: true },
-  { name: 'Emergency first-aid guide', free: false, premium: true },
-  { name: 'Beautifully designed 12-page PDF', free: false, premium: true },
+  { name: 'Emergency red-flag checklist', free: false, premium: true },
+  { name: '"When to call the vet" guide', free: false, premium: true },
+  { name: 'Product recommendations', free: false, premium: true },
+  { name: '12+ page premium PDF', free: false, premium: true },
   { name: 'Lifetime updates', free: false, premium: true },
 ];
 
@@ -31,7 +33,7 @@ const FeatureComparison = () => (
       <div className="p-3 gold-gradient">
         <div className="flex items-center justify-center gap-1">
           <Crown className="w-3.5 h-3.5 text-premium-gold-foreground" />
-          <p className="text-xs font-black uppercase tracking-wider text-premium-gold-foreground">Premium</p>
+          <p className="text-xs font-black uppercase tracking-wider text-premium-gold-foreground">Vault</p>
         </div>
       </div>
     </div>
