@@ -453,7 +453,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   // Trust badges — refined
   const badgeY = 234;
   const bw = (contentW - 28) / 3;
-  const badges = [
+  const badges: { label: string; sub: string; color: readonly [number, number, number]; bg: readonly [number, number, number] }[] = [
     { label: 'Vet-Informed', sub: 'Science-backed', color: C.emerald, bg: C.emeraldBg },
     { label: 'Breed-Specific', sub: 'BOAS-aware', color: C.sky, bg: C.skyBg },
     { label: 'Personalized', sub: 'Tailored for you', color: C.terracotta, bg: C.orangeBg },
