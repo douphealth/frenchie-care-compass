@@ -409,9 +409,9 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   doc.setFont('helvetica', 'normal');
   doc.text('Breed-Specific  •  Vet-Informed  •  Tailored to Your Dog', pw / 2, 68, { align: 'center' });
 
-  // Hero Frenchie image on cover — larger and more prominent
+  // Hero Frenchie image on cover — PNG with transparency for dark background
   try {
-    doc.addImage(heroImg, 'JPEG', pw / 2 - 30, 74, 60, 60);
+    doc.addImage(heroImgPng, 'PNG', pw / 2 - 30, 74, 60, 60);
   } catch (e) { /* graceful fallback if image fails */ }
 
   // Profile card — refined with better spacing
