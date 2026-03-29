@@ -1,9 +1,19 @@
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
-import { Check, Info } from 'lucide-react';
+import {
+  Check, Info, Baby, Dog, HeartPulse, ShieldAlert, Move, Utensils, Wind, Heart,
+  Feather, Scale, TrendingUp, Sofa, Footprints, Zap, Building, Home, Sun, Snowflake,
+} from 'lucide-react';
 
-type Option = { value: string; label: string; description: string; hint?: string };
+const iconMap: Record<string, React.FC<{ className?: string }>> = {
+  baby: Baby, dog: Dog, 'heart-pulse': HeartPulse, 'shield-alert': ShieldAlert,
+  move: Move, utensils: Utensils, wind: Wind, heart: Heart, feather: Feather,
+  scale: Scale, 'trending-up': TrendingUp, sofa: Sofa, footprints: Footprints,
+  zap: Zap, building: Building, home: Home, sun: Sun, snowflake: Snowflake,
+};
+
+type Option = { value: string; label: string; description: string; hint?: string; icon?: string };
 
 type Props = {
   question: string;
@@ -41,11 +51,6 @@ const QuizStep = ({
   const isSelected = (value: string) =>
     type === 'single' ? selected === value : (Array.isArray(selected) && selected.includes(value));
 
-  const getEmoji = (label: string) => {
-    const parts = label.split(' ');
-    return { emoji: parts[0], text: parts.slice(1).join(' ') };
-  };
-
   return (
     <div className="space-y-6">
       <motion.div
@@ -60,8 +65,8 @@ const QuizStep = ({
 
       <div className="grid gap-3">
         {options.map((opt, i) => {
-          const { emoji, text } = getEmoji(opt.label);
           const active = isSelected(opt.value);
+          const IconComp = opt.icon ? iconMap[opt.icon] : null;
           return (
             <motion.button
               key={opt.value}
@@ -75,15 +80,18 @@ const QuizStep = ({
                 'relative flex items-center gap-4 p-4 md:p-5 rounded-2xl border-2 text-left transition-all duration-200',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
                 active
-                  ? 'border-primary bg-primary/8 shadow-lg shadow-primary/10'
+                  ? 'border-primary bg-primary/10 shadow-lg shadow-primary/15 ring-1 ring-primary/20'
                   : 'border-border bg-card hover:border-secondary/40 hover:shadow-md'
               )}
             >
-              <span className="text-3xl md:text-4xl shrink-0 w-12 h-12 flex items-center justify-center rounded-xl bg-muted/50">
-                {emoji}
-              </span>
+              <div className={cn(
+                'shrink-0 w-11 h-11 flex items-center justify-center rounded-xl transition-colors',
+                active ? 'bg-primary/15 text-primary' : 'bg-muted/60 text-muted-foreground'
+              )}>
+                {IconComp ? <IconComp className="w-5 h-5" /> : <Dog className="w-5 h-5" />}
+              </div>
               <div className="flex-1 min-w-0">
-                <div className="font-bold text-foreground text-sm md:text-base">{text}</div>
+                <div className="font-bold text-foreground text-sm md:text-base">{opt.label}</div>
                 <div className="text-xs text-muted-foreground mt-0.5">{opt.description}</div>
                 {opt.hint && (
                   <div className="flex items-center gap-1 mt-1.5 text-[11px] text-secondary/80 font-semibold">

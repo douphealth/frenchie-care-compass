@@ -9,8 +9,8 @@ type Props = {
 
 const badges = [
   { icon: Clock, text: 'Under 2 min' },
-  { icon: Shield, text: '100% free' },
-  { icon: Sparkles, text: 'AI-Personalized' },
+  { icon: Shield, text: 'Breed-specific' },
+  { icon: Sparkles, text: 'Tailored to your dog' },
 ];
 
 const coverageItems = [
@@ -63,11 +63,11 @@ const LandingHero = ({ onStart }: Props) => (
       >
         <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-foreground leading-tight font-display">
           Get Your Frenchie's{' '}
-          <span className="text-gradient">Custom Care Plan</span>{' '}
-          in 60 Seconds
+          <span className="text-gradient">Personalized Care Plan</span>{' '}
+          in Under 2 Minutes
         </h1>
         <p className="text-muted-foreground text-sm md:text-base leading-relaxed max-w-md mx-auto">
-          Answer 5 quick questions and get a breed-specific routine covering feeding, exercise, grooming, skin, and health watchouts — tailored to your French Bulldog's age, lifestyle, and needs.
+          Build a breed-specific routine for feeding, exercise, skin care, heat safety, and health watchouts — based on your French Bulldog's age, lifestyle, and needs.
         </p>
       </motion.div>
 
@@ -101,22 +101,15 @@ const LandingHero = ({ onStart }: Props) => (
         ))}
       </motion.div>
 
-      {/* Social proof */}
+      {/* Trust signals */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.4 }}
         className="flex items-center justify-center gap-2"
       >
-        <div className="flex -space-x-2">
-          {['🧑‍🦰', '👩‍🦱', '🧔', '👩'].map((emoji, i) => (
-            <div key={i} className="w-7 h-7 rounded-full bg-muted border-2 border-background flex items-center justify-center text-sm">
-              {emoji}
-            </div>
-          ))}
-        </div>
         <p className="text-xs text-muted-foreground">
-          <span className="font-bold text-foreground">Trusted by 12,400+</span> Frenchie owners
+          <span className="font-bold text-foreground">No account required</span> · Instant result · Not a substitute for vet care
         </p>
       </motion.div>
 
@@ -151,7 +144,7 @@ const LandingHero = ({ onStart }: Props) => (
           Get My Frenchie Plan
         </Button>
         <p className="text-[10px] text-muted-foreground/60">
-          No account required · Instant results · Not a substitute for vet care
+          One-time result · Personalized to your answers
         </p>
       </motion.div>
 
