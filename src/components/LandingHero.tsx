@@ -101,22 +101,15 @@ const LandingHero = ({ onStart }: Props) => (
         ))}
       </motion.div>
 
-      {/* Social proof */}
+      {/* Trust signals */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.4 }}
         className="flex items-center justify-center gap-2"
       >
-        <div className="flex -space-x-2">
-          {['🧑‍🦰', '👩‍🦱', '🧔', '👩'].map((emoji, i) => (
-            <div key={i} className="w-7 h-7 rounded-full bg-muted border-2 border-background flex items-center justify-center text-sm">
-              {emoji}
-            </div>
-          ))}
-        </div>
         <p className="text-xs text-muted-foreground">
-          <span className="font-bold text-foreground">Trusted by 12,400+</span> Frenchie owners
+          <span className="font-bold text-foreground">No account required</span> · Instant result · Not a substitute for vet care
         </p>
       </motion.div>
 
