@@ -28,6 +28,28 @@ async function loadImageAsBase64(url: string, maxWidth = 400, quality = 0.7): Pr
     img.src = URL.createObjectURL(blob);
   });
 }
+
+/* Load image as PNG (preserves transparency) for use on dark backgrounds */
+async function loadImageAsPng(url: string, maxWidth = 400): Promise<string> {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+      // No background fill — keep transparency
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.src = URL.createObjectURL(blob);
+  });
+}
 /* ── Brand Palette (RGB) ── */
 const C = {
   cream:      [250, 245, 235] as const,
@@ -144,8 +166,9 @@ function getPortionPerMeal(w: string, stage: string, bc: number): { cups: string
 }
 
 export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Promise<void> {
-  // Load images
-  const [heroImg, faceImg, pawImg] = await Promise.all([
+  // Load images — hero as PNG (transparent, for dark cover bg), others as JPEG
+  const [heroImgPng, heroImg, faceImg, pawImg] = await Promise.all([
+    loadImageAsPng(frenchieHeroUrl, 400),
     loadImageAsBase64(frenchieHeroUrl),
     loadImageAsBase64(frenchieFaceUrl),
     loadImageAsBase64(pawIconUrl),
@@ -386,9 +409,9 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   doc.setFont('helvetica', 'normal');
   doc.text('Breed-Specific  •  Vet-Informed  •  Tailored to Your Dog', pw / 2, 68, { align: 'center' });
 
-  // Hero Frenchie image on cover — larger and more prominent
+  // Hero Frenchie image on cover — PNG with transparency for dark background
   try {
-    doc.addImage(heroImg, 'JPEG', pw / 2 - 30, 74, 60, 60);
+    doc.addImage(heroImgPng, 'PNG', pw / 2 - 30, 74, 60, 60);
   } catch (e) { /* graceful fallback if image fails */ }
 
   // Profile card — refined with better spacing

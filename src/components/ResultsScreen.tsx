@@ -153,7 +153,7 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
               onClick={onUpgrade}
               className="w-full h-12 rounded-xl font-black text-base gold-gradient text-premium-gold-foreground shadow-lg hover:shadow-xl transition-all"
             >
-              Unlock My Frenchie Care Vault — $9.99
+              Unlock My Frenchie Care Vault — $7.99
             </Button>
             
             <p className="text-center text-xs text-muted-foreground mt-2">
