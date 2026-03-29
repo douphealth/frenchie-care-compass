@@ -346,62 +346,77 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   };
 
   /* ═══════════════════════════════════════════════
-   * PAGE 1: COVER PAGE
+   * PAGE 1: COVER PAGE — Premium editorial design
    * ═══════════════════════════════════════════════ */
   newPageBg();
 
+  // Full-width dark brown header block with gold accents
   doc.setFillColor(...C.brown);
-  doc.rect(0, 0, pw, 105, 'F');
+  doc.rect(0, 0, pw, 115, 'F');
 
-  // Decorative gold accents
+  // Subtle decorative gold lines
   doc.setFillColor(...C.gold);
-  doc.rect(0, 105, pw, 2.5, 'F');
+  doc.rect(0, 115, pw, 1.5, 'F');
   doc.setFillColor(...C.terracotta);
-  doc.rect(0, 107.5, pw, 1, 'F');
+  doc.rect(0, 116.5, pw, 0.6, 'F');
 
-  doc.setFontSize(12);
-  doc.setTextColor(...C.goldLight);
-  doc.setFont('helvetica', 'bold');
-  doc.text('FRENCHYFAB', pw / 2, 22, { align: 'center' });
-
+  // Small decorative gold rule at top
   doc.setDrawColor(...C.gold);
-  doc.setLineWidth(0.5);
-  doc.line(pw / 2 - 20, 26, pw / 2 + 20, 26);
-
-  doc.setFontSize(28);
-  doc.setTextColor(...C.white);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Your Personalized', pw / 2, 42, { align: 'center' });
-  doc.text('Frenchie Care Plan', pw / 2, 56, { align: 'center' });
+  doc.setLineWidth(0.4);
+  doc.line(pw / 2 - 25, 16, pw / 2 + 25, 16);
 
   doc.setFontSize(10);
   doc.setTextColor(...C.goldLight);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Science-Backed Recommendations for a Happier, Healthier French Bulldog', pw / 2, 72, { align: 'center' });
+  doc.setFont('helvetica', 'bold');
+  doc.text('FRENCHYFAB', pw / 2, 13, { align: 'center' });
 
-  // Hero Frenchie image on cover (centered, below header)
+  // Decorative diamond
+  doc.setFillColor(...C.gold);
+  doc.setDrawColor(...C.gold);
+
+  doc.setFontSize(30);
+  doc.setTextColor(...C.white);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Your Personalized', pw / 2, 38, { align: 'center' });
+  doc.text('Frenchie Care Plan', pw / 2, 54, { align: 'center' });
+
+  // Elegant subtitle
+  doc.setFontSize(9);
+  doc.setTextColor(...C.goldLight);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Breed-Specific  •  Vet-Informed  •  Tailored to Your Dog', pw / 2, 68, { align: 'center' });
+
+  // Hero Frenchie image on cover — larger and more prominent
   try {
-    doc.addImage(heroImg, 'JPEG', pw / 2 - 25, 78, 50, 50);
+    doc.addImage(heroImg, 'JPEG', pw / 2 - 30, 74, 60, 60);
   } catch (e) { /* graceful fallback if image fails */ }
 
-  // Profile card
-  const cardY = 118;
-  const cardH = 90;
-  doc.setFillColor(...C.white);
-  doc.roundedRect(mx + 12, cardY, contentW - 24, cardH, 5, 5, 'F');
-  doc.setDrawColor(...C.border);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(mx + 12, cardY, contentW - 24, cardH, 5, 5, 'S');
+  // Profile card — refined with better spacing
+  const cardY = 126;
+  const cardH = 82;
+  const cardMx = mx + 10;
+  const cardW = contentW - 20;
 
+  // Card shadow effect
+  doc.setFillColor(220, 215, 205);
+  doc.roundedRect(cardMx + 1, cardY + 1, cardW, cardH, 4, 4, 'F');
+  // Main card
+  doc.setFillColor(...C.white);
+  doc.roundedRect(cardMx, cardY, cardW, cardH, 4, 4, 'F');
+  doc.setDrawColor(...C.gold);
+  doc.setLineWidth(0.4);
+  doc.roundedRect(cardMx, cardY, cardW, cardH, 4, 4, 'S');
+
+  // Card header
   doc.setFillColor(...C.accentBg);
-  doc.roundedRect(mx + 12, cardY, contentW - 24, 14, 5, 5, 'F');
+  doc.roundedRect(cardMx, cardY, cardW, 12, 4, 4, 'F');
   doc.setFillColor(...C.white);
-  doc.rect(mx + 12, cardY + 10, contentW - 24, 4, 'F');
+  doc.rect(cardMx, cardY + 8, cardW, 4, 'F');
 
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setTextColor(...C.brown);
   doc.setFont('helvetica', 'bold');
-  doc.text("YOUR FRENCHIE'S PROFILE", pw / 2, cardY + 9.5, { align: 'center' });
+  doc.text("YOUR FRENCHIE'S PROFILE", pw / 2, cardY + 8, { align: 'center' });
 
   const profileData = [
     ['Life Stage', stageLabel(answers.lifeStage)],
@@ -412,52 +427,64 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
     ['Environment', answers.environment.length > 0 ? answers.environment.join(', ') : 'Not specified'],
   ];
 
-  const colX1 = mx + 22;
-  const colX2 = pw / 2 + 8;
-  let profileY = cardY + 22;
+  const colX1 = cardMx + 10;
+  const colX2 = pw / 2 + 6;
+  let profileY = cardY + 20;
 
-  doc.setFontSize(8.5);
+  doc.setFontSize(7.5);
   profileData.forEach((item, i) => {
     const xLabel = i % 2 === 0 ? colX1 : colX2;
     const row = Math.floor(i / 2);
-    const rowY = profileY + row * 16;
+    const rowY = profileY + row * 15;
     doc.setTextColor(...C.textMuted);
     doc.setFont('helvetica', 'normal');
     doc.text(item[0].toUpperCase(), xLabel, rowY);
     doc.setTextColor(...C.text);
     doc.setFont('helvetica', 'bold');
-    doc.text(item[1], xLabel, rowY + 6);
+    doc.text(item[1], xLabel, rowY + 5.5);
   });
 
-  doc.setFontSize(8);
+  // Date
+  doc.setFontSize(7.5);
   doc.setTextColor(...C.textMuted);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Generated on ${today}`, pw / 2, 228, { align: 'center' });
+  doc.text(`Generated on ${today}`, pw / 2, 222, { align: 'center' });
 
-  // Trust badges
-  const badgeY = 240;
+  // Trust badges — refined
+  const badgeY = 234;
   const bw = (contentW - 28) / 3;
-  doc.setFillColor(...C.successBg);
-  doc.roundedRect(mx + 12, badgeY, bw, 18, 3, 3, 'F');
-  doc.setFillColor(...C.skyBg);
-  doc.roundedRect(mx + 12 + bw + 2, badgeY, bw, 18, 3, 3, 'F');
-  doc.setFillColor(...C.orangeBg);
-  doc.roundedRect(mx + 12 + (bw + 2) * 2, badgeY, bw, 18, 3, 3, 'F');
+  const badges = [
+    { label: 'Vet-Informed', sub: 'Science-backed', color: C.emerald, bg: C.emeraldBg },
+    { label: 'Breed-Specific', sub: 'BOAS-aware', color: C.sky, bg: C.skyBg },
+    { label: 'Personalized', sub: 'Tailored for you', color: C.terracotta, bg: C.orangeBg },
+  ];
 
-  doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.emerald);
-  doc.text('Vet-Informed', mx + 12 + bw / 2, badgeY + 8, { align: 'center' });
-  doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.textMuted);
-  doc.text('Science-backed', mx + 12 + bw / 2, badgeY + 13, { align: 'center' });
+  badges.forEach((badge, i) => {
+    const bx = mx + 12 + i * (bw + 2);
+    doc.setFillColor(...badge.bg);
+    doc.roundedRect(bx, badgeY, bw, 16, 3, 3, 'F');
+    doc.setDrawColor(badge.color[0], badge.color[1], badge.color[2]);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(bx, badgeY, bw, 16, 3, 3, 'S');
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(badge.color[0], badge.color[1], badge.color[2]);
+    doc.text(badge.label, bx + bw / 2, badgeY + 7, { align: 'center' });
+    doc.setFontSize(5.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...C.textMuted);
+    doc.text(badge.sub, bx + bw / 2, badgeY + 12, { align: 'center' });
+  });
 
-  doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.sky);
-  doc.text('Breed-Specific', mx + 12 + bw + 2 + bw / 2, badgeY + 8, { align: 'center' });
-  doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.textMuted);
-  doc.text('BOAS-aware', mx + 12 + bw + 2 + bw / 2, badgeY + 13, { align: 'center' });
+  // Decorative bottom accent
+  doc.setDrawColor(...C.gold);
+  doc.setLineWidth(0.3);
+  doc.line(pw / 2 - 30, 260, pw / 2 + 30, 260);
 
-  doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.orange);
-  doc.text('AI-Personalized', mx + 12 + (bw + 2) * 2 + bw / 2, badgeY + 8, { align: 'center' });
-  doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.textMuted);
-  doc.text('Tailored for you', mx + 12 + (bw + 2) * 2 + bw / 2, badgeY + 13, { align: 'center' });
+  doc.setFontSize(7);
+  doc.setTextColor(...C.textMuted);
+  doc.setFont('helvetica', 'italic');
+  doc.text('This plan provides general guidance. Always consult your veterinarian for medical decisions.', pw / 2, 268, { align: 'center' });
 
   addFooter();
 
