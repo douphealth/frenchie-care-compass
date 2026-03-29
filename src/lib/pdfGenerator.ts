@@ -165,10 +165,16 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
     pageNum++;
     doc.setFillColor(...C.cream);
     doc.rect(0, 0, pw, ph, 'F');
+    // Top decorative bar
     doc.setFillColor(...C.brown);
-    doc.rect(0, 0, pw, 3, 'F');
+    doc.rect(0, 0, pw, 2.5, 'F');
+    doc.setFillColor(...C.gold);
+    doc.rect(0, 2.5, pw, 0.8, 'F');
     doc.setFillColor(...C.terracotta);
-    doc.rect(0, 3, pw, 1, 'F');
+    doc.rect(0, 3.3, pw, 0.4, 'F');
+    // Bottom accent line
+    doc.setFillColor(...C.brown);
+    doc.rect(0, ph - 2, pw, 2, 'F');
   };
 
   const addFooter = () => {
