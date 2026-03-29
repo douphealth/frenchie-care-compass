@@ -160,8 +160,7 @@ Generate the most thorough, clinically precise care plan possible. Each recommen
       throw new Error("No content in AI response");
     }
 
-    const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const planData = JSON.parse(cleanContent);
+    const planData = extractJsonFromResponse(content);
 
     // Map icon codes to emoji and sanitize
     const sections = planData.sections.map((s: any) => ({
