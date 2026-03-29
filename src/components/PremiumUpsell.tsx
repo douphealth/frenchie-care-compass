@@ -233,14 +233,14 @@ const PremiumUpsell = ({ onSkip }: Props) => {
             onClick={handleCheckout}
             disabled={loading}
             size="lg"
-            className="w-full h-14 rounded-2xl text-base font-black gap-2 gold-gradient text-premium-gold-foreground hover:opacity-90 transition-opacity shadow-xl shadow-premium-gold/20"
+            className="w-full h-14 rounded-2xl text-sm font-black gap-1.5 gold-gradient text-premium-gold-foreground hover:opacity-90 transition-opacity shadow-xl shadow-premium-gold/20 px-4"
           >
             {loading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin shrink-0" />
             ) : (
-              <Download className="w-5 h-5" />
+              <Download className="w-4 h-4 shrink-0" />
             )}
-            {loading ? 'Opening checkout...' : `Unlock My Frenchie Care Vault — $${addBump ? '14.98' : '9.99'}`}
+            <span className="truncate">{loading ? 'Opening checkout...' : `Unlock My Frenchie Care Vault — $${addBump ? '12.98' : '7.99'}`}</span>
           </Button>
           <div className="flex items-center justify-center gap-2 mt-3 py-2 px-4 rounded-lg bg-emerald-50 border border-emerald-200/50">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
