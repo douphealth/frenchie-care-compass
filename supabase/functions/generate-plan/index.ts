@@ -66,11 +66,74 @@ CONDITIONAL SECTIONS:
 - If concern is "wellness": add icon: "WELLNESS", title: "Preventive Wellness Checklist"
 
 QUALITY STANDARDS:
-- Each section MUST have 6-8 detailed recommendations
+- Each section MUST have exactly 5 detailed recommendations (no more, no less)
+- Keep each recommendation to 2 sentences maximum
 - Every calorie/portion number must be mathematically derived from the dog's weight and life stage
 - Supplement dosages must be weight-appropriate (mg per kg or per lb)
 - Exercise recommendations must account for brachycephalic airway compromise
 - Include at least one "red flag" warning sign per health section item where relevant`;
+
+function extractJsonFromResponse(response: string): any {
+  let cleaned = response
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .trim();
+
+  const jsonStart = cleaned.indexOf("{");
+  if (jsonStart === -1) throw new Error("No JSON object found in response");
+
+  // Try to find proper end
+  let jsonEnd = cleaned.lastIndexOf("}");
+  if (jsonEnd === -1) jsonEnd = cleaned.length - 1;
+
+  cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+
+  // First attempt
+  try {
+    return JSON.parse(cleaned);
+  } catch (_e) {
+    // Fix common truncation issues
+  }
+
+  // Fix trailing commas, control chars
+  cleaned = cleaned
+    .replace(/,\s*}/g, "}")
+    .replace(/,\s*]/g, "]")
+    .replace(/[\x00-\x1F\x7F]/g, (c) => c === "\n" || c === "\t" ? c : "");
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (_e2) {
+    // Response likely truncated — try to repair by closing open brackets/braces
+  }
+
+  // Count and close unclosed brackets
+  const openBrackets = (cleaned.match(/\[/g) || []).length;
+  const closeBrackets = (cleaned.match(/\]/g) || []).length;
+  const openBraces = (cleaned.match(/\{/g) || []).length;
+  const closeBraces = (cleaned.match(/\}/g) || []).length;
+
+  // Trim to last complete string (remove partial trailing item)
+  cleaned = cleaned.replace(/,\s*"[^"]*$/, "");
+  cleaned = cleaned.replace(/,\s*$/, "");
+
+  // Close arrays then objects
+  for (let i = 0; i < openBrackets - closeBrackets; i++) cleaned += "]";
+  for (let i = 0; i < openBraces - closeBraces; i++) cleaned += "}";
+
+  // Final cleanup pass
+  cleaned = cleaned
+    .replace(/,\s*}/g, "}")
+    .replace(/,\s*]/g, "]");
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {
+    console.error("JSON repair failed. First 500 chars:", cleaned.substring(0, 500));
+    console.error("Last 200 chars:", cleaned.substring(cleaned.length - 200));
+    throw new Error("Failed to parse AI response as JSON after repair attempts");
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -160,8 +223,7 @@ Generate the most thorough, clinically precise care plan possible. Each recommen
       throw new Error("No content in AI response");
     }
 
-    const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const planData = JSON.parse(cleanContent);
+    const planData = extractJsonFromResponse(content);
 
     // Map icon codes to emoji and sanitize
     const sections = planData.sections.map((s: any) => ({
