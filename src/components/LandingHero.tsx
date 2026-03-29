@@ -9,8 +9,8 @@ type Props = {
 
 const badges = [
   { icon: Clock, text: 'Under 2 min' },
-  { icon: Shield, text: '100% free' },
-  { icon: Sparkles, text: 'AI-Personalized' },
+  { icon: Shield, text: 'Breed-specific' },
+  { icon: Sparkles, text: 'Tailored to your dog' },
 ];
 
 const coverageItems = [
