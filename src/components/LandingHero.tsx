@@ -144,7 +144,7 @@ const LandingHero = ({ onStart }: Props) => (
           Get My Frenchie Plan
         </Button>
         <p className="text-[10px] text-muted-foreground/60">
-          No account required · Instant results · Not a substitute for vet care
+          One-time result · Personalized to your answers
         </p>
       </motion.div>
 
