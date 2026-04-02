@@ -1364,6 +1364,8 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   doc.setTextColor(...C.terracotta);
   doc.setFont('helvetica', 'bold');
   doc.text('frenchyfab.com', pw / 2, ph / 2 + 28, { align: 'center' });
+  // Clickable link on frenchyfab.com text
+  doc.link(pw / 2 - 25, ph / 2 + 22, 50, 10, { url: 'https://frenchyfab.com' });
 
   doc.setFontSize(9);
   doc.setTextColor(...C.textMuted);
