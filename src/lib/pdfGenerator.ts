@@ -288,6 +288,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   const drawArticleLink = (label: string, url: string) => {
     ensureSpace(14);
     y += 2;
+    const fullUrl = url.startsWith('http') ? url : `https://${url}`;
     doc.setFillColor(...C.accentBg);
     doc.roundedRect(mx, y, contentW, 10, 2, 2, 'F');
     doc.setDrawColor(...C.terracotta);
@@ -300,6 +301,8 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...C.terracotta);
     doc.text(stripEmoji(url), pw - mx - 5, y + 6.5, { align: 'right' });
+    // Make the entire box a clickable link
+    doc.link(mx, y, contentW, 10, { url: fullUrl });
     y += 14;
   };
 
