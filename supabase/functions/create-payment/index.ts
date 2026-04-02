@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { email } = await req.json();
+    const { email, addBump } = await req.json();
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2025-08-27.basil",
@@ -28,15 +28,24 @@ serve(async (req) => {
       }
     }
 
+    const lineItems = [
+      {
+        price: "price_1TFD07GCqwm95OGXc26k5JkI",
+        quantity: 1,
+      },
+    ];
+
+    if (addBump) {
+      lineItems.push({
+        price: "price_1THjRhGCqwm95OGXJZf9x553",
+        quantity: 1,
+      });
+    }
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : email,
-      line_items: [
-        {
-          price: "price_1TFD07GCqwm95OGXc26k5JkI",
-          quantity: 1,
-        },
-      ],
+      line_items: lineItems,
       mode: "payment",
       success_url: `${req.headers.get("origin")}/payment-success`,
       cancel_url: `${req.headers.get("origin")}/?screen=upsell`,
