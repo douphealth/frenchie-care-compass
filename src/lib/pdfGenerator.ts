@@ -1300,6 +1300,9 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
     doc.setTextColor(...C.terracotta);
     doc.setFontSize(7);
     doc.text(res.url, mx + 7, y + 21);
+    // Make entire resource card a clickable link
+    const fullResUrl = res.url.startsWith('http') ? res.url : `https://${res.url}`;
+    doc.link(mx, y, contentW, 24, { url: fullResUrl });
 
     y += 28;
   });
