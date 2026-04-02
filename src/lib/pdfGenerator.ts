@@ -208,6 +208,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
     doc.setTextColor(...C.textMuted);
     doc.setFont('helvetica', 'normal');
     doc.text('FrenchyFab.com  |  Your French Bulldog Care Companion', mx, ph - 9);
+    doc.link(mx, ph - 13, 60, 8, { url: 'https://frenchyfab.com' });
     doc.text(`Page ${pageNum}`, pw - mx, ph - 9, { align: 'right' });
   };
 
