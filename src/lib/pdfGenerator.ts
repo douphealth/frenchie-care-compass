@@ -1387,6 +1387,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   doc.setFontSize(7);
   doc.setTextColor(...C.textMuted);
   doc.text('FrenchyFab.com  |  Your French Bulldog Care Companion', mx, ph - 9);
+  doc.link(mx, ph - 13, 60, 8, { url: 'https://frenchyfab.com' });
 
   /* ── SAVE ── */
   doc.save('FrenchyFab-Care-Plan.pdf');
