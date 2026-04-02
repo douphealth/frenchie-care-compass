@@ -208,6 +208,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
     doc.setTextColor(...C.textMuted);
     doc.setFont('helvetica', 'normal');
     doc.text('FrenchyFab.com  |  Your French Bulldog Care Companion', mx, ph - 9);
+    doc.link(mx, ph - 13, 60, 8, { url: 'https://frenchyfab.com' });
     doc.text(`Page ${pageNum}`, pw - mx, ph - 9, { align: 'right' });
   };
 
@@ -288,6 +289,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   const drawArticleLink = (label: string, url: string) => {
     ensureSpace(14);
     y += 2;
+    const fullUrl = url.startsWith('http') ? url : `https://${url}`;
     doc.setFillColor(...C.accentBg);
     doc.roundedRect(mx, y, contentW, 10, 2, 2, 'F');
     doc.setDrawColor(...C.terracotta);
@@ -300,6 +302,8 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...C.terracotta);
     doc.text(stripEmoji(url), pw - mx - 5, y + 6.5, { align: 'right' });
+    // Make the entire box a clickable link
+    doc.link(mx, y, contentW, 10, { url: fullUrl });
     y += 14;
   };
 
@@ -1297,6 +1301,9 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
     doc.setTextColor(...C.terracotta);
     doc.setFontSize(7);
     doc.text(res.url, mx + 7, y + 21);
+    // Make entire resource card a clickable link
+    const fullResUrl = res.url.startsWith('http') ? res.url : `https://${res.url}`;
+    doc.link(mx, y, contentW, 24, { url: fullResUrl });
 
     y += 28;
   });
@@ -1358,6 +1365,8 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   doc.setTextColor(...C.terracotta);
   doc.setFont('helvetica', 'bold');
   doc.text('frenchyfab.com', pw / 2, ph / 2 + 28, { align: 'center' });
+  // Clickable link on frenchyfab.com text
+  doc.link(pw / 2 - 25, ph / 2 + 22, 50, 10, { url: 'https://frenchyfab.com' });
 
   doc.setFontSize(9);
   doc.setTextColor(...C.textMuted);
@@ -1378,6 +1387,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   doc.setFontSize(7);
   doc.setTextColor(...C.textMuted);
   doc.text('FrenchyFab.com  |  Your French Bulldog Care Companion', mx, ph - 9);
+  doc.link(mx, ph - 13, 60, 8, { url: 'https://frenchyfab.com' });
 
   /* ── SAVE ── */
   doc.save('FrenchyFab-Care-Plan.pdf');
