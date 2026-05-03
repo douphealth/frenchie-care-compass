@@ -9,7 +9,8 @@ import LoadingScreen from '@/components/LoadingScreen';
 import ExitIntentPopup from '@/components/ExitIntentPopup';
 import { quizSteps, QuizAnswers } from '@/lib/quizData';
 import { generatePlan, PlanSection } from '@/lib/planGenerator';
-import { supabase } from '@/integrations/supabase/client';
+import { generateAiPlan, submitLead, trackRevenueEvent } from '@/lib/revenueBackend';
+import { toast } from '@/hooks/use-toast';
 
 type Screen = 'landing' | 'quiz' | 'loading' | 'emailGate' | 'results' | 'upsell';
 
@@ -37,23 +38,11 @@ const Index = () => {
     if (step < quizSteps.length - 1) {
       setStep(s => s + 1);
     } else {
-      // Quiz complete — generate AI plan
+      // Quiz complete — generate the best available plan.
+      // AI is a progressive enhancement; a deterministic care plan keeps the funnel resilient.
       setScreen('loading');
-      try {
-        const { data, error } = await supabase.functions.invoke('generate-plan', {
-          body: { answers },
-        });
-
-        if (error || !data?.sections) {
-          console.log('AI plan failed, using template fallback:', error);
-          setPlan(generatePlan(answers));
-        } else {
-          setPlan(data.sections);
-        }
-      } catch (err) {
-        console.log('AI plan error, using template fallback:', err);
-        setPlan(generatePlan(answers));
-      }
+      const aiPlan = await generateAiPlan(answers);
+      setPlan(aiPlan || generatePlan(answers));
       setScreen('emailGate');
     }
   };
@@ -65,14 +54,27 @@ const Index = () => {
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
-    localStorage.setItem('frenchie_email', email);
-    setScreen('results');
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) return;
 
-    // Fire-and-forget: send welcome email (silently ignore failures)
-    supabase.functions.invoke('send-welcome-email', {
-      body: { email, answers },
-    }).catch(() => {});
+    localStorage.setItem('frenchie_email', normalizedEmail);
+
+    try {
+      await submitLead({ email: normalizedEmail, answers, plan, source: 'frenchie-care-plan-app' });
+      toast({
+        title: 'Your free plan is saved',
+        description: 'We saved your Frenchie profile and unlocked your personalized care plan.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Plan unlocked',
+        description: 'Your plan is saved in this browser. We will retry lead sync when the backend is available.',
+        variant: 'destructive',
+      });
+    }
+
+    setScreen('results');
+    trackRevenueEvent('free_result_viewed');
   };
 
   const handleStartOver = () => {

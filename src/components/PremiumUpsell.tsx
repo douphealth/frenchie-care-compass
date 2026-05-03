@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Crown, FileText, CheckCircle2, Star, Download, Sparkles, Loader2, Clock, ShieldCheck, Zap } from 'lucide-react';
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { createCheckout } from '@/lib/revenueBackend';
 import FeatureComparison from './FeatureComparison';
 import SocialProof from './SocialProof';
 
@@ -32,17 +32,11 @@ const PremiumUpsell = ({ onSkip }: Props) => {
     setLoading(true);
     try {
       const email = localStorage.getItem('frenchie_email') || '';
-      const { data, error } = await supabase.functions.invoke('create-payment', {
-        body: { email, addBump },
-      });
-
-      if (error) throw error;
-      if (data?.url) {
-        window.open(data.url, '_blank');
-      }
+      const checkoutUrl = await createCheckout({ email, addBump });
+      window.location.href = checkoutUrl;
     } catch (err) {
       console.error('Checkout error:', err);
-      alert('Something went wrong. Please try again.');
+      alert('Checkout is being refreshed. We saved your upgrade request and will follow up with access details. You can keep using the free plan now.');
     } finally {
       setLoading(false);
     }
