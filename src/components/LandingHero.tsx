@@ -109,7 +109,7 @@ const LandingHero = ({ onStart }: Props) => (
         className="flex items-center justify-center gap-2"
       >
         <p className="text-xs text-muted-foreground">
-          <span className="font-bold text-foreground">No account required</span> · Instant result · Not a substitute for vet care
+          <span className="font-bold text-foreground">Free to start</span> · Email saves your plan · Not a substitute for vet care
         </p>
       </motion.div>
 
@@ -141,7 +141,7 @@ const LandingHero = ({ onStart }: Props) => (
           className="w-full max-w-sm mx-auto text-base font-black gap-2.5 h-14 rounded-2xl premium-gradient text-primary-foreground hover:opacity-90 transition-opacity shadow-xl shadow-primary/20"
         >
           <PawPrint className="w-5 h-5" />
-          Get My Frenchie Plan
+          Get My Free Plan
         </Button>
         <p className="text-[10px] text-muted-foreground/60">
           One-time result · Personalized to your answers
