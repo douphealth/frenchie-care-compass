@@ -33,7 +33,7 @@ const EmailGate = ({ plan, email, setEmail, onSubmit }: Props) => (
           Your Care Plan is Ready!
         </h2>
         <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-          We've generated a personalized plan just for your Frenchie. Enter your email to unlock it.
+          We've generated a personalized plan just for your Frenchie. Enter your email to save it and reveal the full free plan.
         </p>
         <div className="flex items-center justify-center gap-3">
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-full">
@@ -54,7 +54,7 @@ const EmailGate = ({ plan, email, setEmail, onSubmit }: Props) => (
           className="glass-card rounded-2xl p-5 space-y-3 shadow-xl border-2 border-border/60"
         >
           <p className="text-center text-sm font-bold text-foreground">
-            Unlock your full personalized care plan
+            Save & reveal your free personalized care plan
           </p>
           <div className="flex gap-2">
             <Input
@@ -67,7 +67,7 @@ const EmailGate = ({ plan, email, setEmail, onSubmit }: Props) => (
             />
             <Button type="submit" className="h-12 rounded-xl px-6 font-black gap-1.5 premium-gradient text-primary-foreground shadow-md">
               <Mail className="w-4 h-4" />
-              Unlock
+              Reveal
             </Button>
           </div>
           <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
