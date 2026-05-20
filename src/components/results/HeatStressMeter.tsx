@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Thermometer, BookOpen } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
@@ -23,7 +23,7 @@ type Props = { onZoneChange?: (z: HeatZone) => void };
 const HeatStressMeter = ({ onZoneChange }: Props) => {
   const [tempF, setTempF] = useState(78);
   const risk = useMemo(() => heatRisk(tempF), [tempF]);
-  useMemo(() => onZoneChange?.(risk.zone), [risk.zone, onZoneChange]);
+  useEffect(() => { onZoneChange?.(risk.zone); }, [risk.zone, onZoneChange]);
 
   // Map 50–100°F to 0–100% height
   const fillPct = Math.max(0, Math.min(100, ((tempF - 50) / 50) * 100));

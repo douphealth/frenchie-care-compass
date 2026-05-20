@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Wind, BookOpen } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
@@ -32,7 +32,7 @@ const BoasScorecard = ({ onLevelChange }: Props) => {
   );
 
   // bubble level up
-  useMemo(() => onLevelChange?.(result.level), [result.level, onLevelChange]);
+  useEffect(() => { onLevelChange?.(result.level); }, [result.level, onLevelChange]);
 
   const levelLabel =
     result.level === 'urgent' ? 'Urgent Action Required'
