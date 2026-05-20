@@ -1,61 +1,89 @@
+# Frenchie Care Compass — Enterprise Overhaul Plan
 
+A focused plan to rebuild the app around a clinical engine, dynamic helpful tools, and stronger monetization without breaking the existing Stripe / PDF / Supabase flow.
 
-## Frenchie Care Planner — Personalized Care Plans for French Bulldog Owners
+## 1. Design System Refresh
+- Update `src/index.css` + `tailwind.config.ts` semantic tokens:
+  - `--primary`: deep vet green `#1E3F20`
+  - `--background`: clean cream `#FAF7EF`
+  - `--accent` / `--warning`: amber/orange for safety callouts
+  - `--destructive`: warm red for "Urgent Action" banners
+- Keep shadcn component shapes; only retheme tokens so existing UI stays consistent.
 
-### Overview
-A step-by-step quiz that generates a personalized French Bulldog care plan. Users see a preview of their plan, then enter their email to unlock the full version. Warm, earthy design matching the Frenchy Fab brand.
+## 2. Local-First Persistence
+- New `src/lib/profileStore.ts` wrapping `localStorage` with a single key (`frenchie_profile_v1`) storing:
+  - `dogProfile` (name, age in months, weight kg, sex, neutered, conditions[])
+  - `quizAnswers`
+  - `plan` (last generated)
+  - `email`, `completedAt`
+- On `Index.tsx` mount: hydrate state; if a completed plan exists, skip landing/quiz and land on `results` (with a small "Start over" affordance already present).
 
----
+## 3. Clinical Engine
+New `src/lib/clinical.ts` with pure functions + unit-tested logic:
+- `calcMER({ weightKg, kFactor })` → `K * weight^0.75` kcal/day
+- `pickKFactor(profile)` → 140 / 130 / 95 / 80 based on life stage, neuter status, BCS / activity
+- `kcalToCups(kcal, kcalPerCup = 350)` → cups/day (rounded to ¼)
+- `boasScore({ breathingSound, activityTolerance, snoring })` → `{ level: 'low'|'moderate'|'urgent', score, reasons[] }`
+- `heatRisk({ tempF })` → zones: safe (<70), caution (70–80), danger (80–85), emergency (>85)
+- Each output carries a `citation` string (e.g., "WSAVA / NRC 2006 clinical equation").
 
-### Page 1: Landing / Quiz Start
-- Hero section with headline: **"Get Your French Bulldog's Personalized Care Plan in 60 Seconds"**
-- Subtext explaining what they'll get (feeding, grooming, exercise, health watch-outs)
-- Cute Frenchie illustration placeholder + "Start My Plan" CTA button
-- Warm color palette: cream background (#F5E6D3), brown accents (#8B4513), terracotta buttons (#D4956A)
+Quiz additions (`src/lib/quizData.ts`):
+- Add `breathingSound` (Quiet / Snoring / Raspy / Struggling)
+- Add `neutered` (yes/no), `ageMonths` numeric, `weightKg` numeric, `name`
 
-### Page 2: Step-by-Step Quiz (5 screens with progress bar)
-Each screen shows one question with visual option cards:
+## 4. New Result Modules
+Under `src/components/results/`:
+- `CalorieCard.tsx` — shows MER kcal, cups/day, K-factor used, formula citation badge.
+- `BoasScorecard.tsx` — interactive slider mapping breathing symptoms → live score + color band.
+- `HeatStressMeter.tsx` — vertical thermometer SVG with safe/caution/danger/emergency bands and the 80°F absolute limit marker.
+- `UrgentVetBanner.tsx` — rendered when `boas==='urgent'` or `heat==='emergency'`; amber/red banner with telehealth CTA (affiliate URL placeholder via `VITE_TELEHEALTH_URL`).
+- `AffiliateGrid.tsx` — pure function `pickProducts(answers)` returns curated items:
+  - Gassy → 3 slow feeders + probiotic
+  - Raspy/Struggling breathing → warning against neck collars + 2 Y-harnesses
+  - Overheating/hot climate → cooling vest
+  - Each card shows "why recommended" sentence derived from the triggering answer.
+  Products live in `src/lib/affiliateCatalog.ts` with `{ id, title, badge, why, url, image }`.
 
-1. **Life Stage** — Puppy (under 1yr) / Adult (1-7yr) / Senior (7+yr)
-2. **Weight & Body Condition** — Under 20 lbs / 20-28 lbs / Over 28 lbs + slider for body condition
-3. **Main Concern** — Skin & allergies / Pulling on walks / Diet & weight / Breathing / General wellness
-4. **Activity Level** — Low (couch potato) / Moderate / Active
-5. **Living Environment** — Apartment / House with yard / Hot climate / Cold climate (multi-select)
+Wire all modules into `ResultsScreen.tsx` above the existing premium upsell.
 
-Smooth transitions between steps, back button, progress indicator at top.
+## 5. Calendar (.ICS) Generator
+- `src/lib/icsGenerator.ts` builds a valid VCALENDAR string with recurring VEVENTs:
+  - Daily: skin-fold check, face wipe
+  - Weekly: weight log, ear check
+  - Bi-weekly: nail trim
+  - Monthly: full grooming + vet check reminder
+  - Seasonal: heat-stroke alert (Jun–Aug) if puppy or hot climate
+- `downloadIcs(filename, content)` triggers a Blob download.
+- Button "Sync Daily Care Tasks to My Calendar" on results; gated by the email modal.
 
-### Page 3: Plan Preview + Email Gate
-- Show a teaser of the personalized plan (first 2-3 sections visible, rest blurred)
-- Email capture form: "Enter your email to unlock your full care plan"
-- After email entry, reveal the complete plan
+## 6. Email Lead-Gate Modal
+- `src/components/LeadGateModal.tsx` reusing shadcn `Dialog` + zod-validated form (name, email, dog age).
+- Persists to `localStorage` and POSTs to existing `submitLead` in `revenueBackend.ts` (extend payload).
+- Gates: ICS download + "Detailed PDF Guide" button (existing free PDF stays open; the premium guide CTA stays Stripe-gated).
+- Once captured, modal never reappears (flag in localStorage).
 
-### Page 4: Full Care Plan Results
-Personalized sections based on quiz answers:
+## 7. Print-Friendly Results
+- Add `@media print` block in `index.css`:
+  - Hide `.no-print` (nav, buttons, upsell, modals)
+  - Force light background, single-column, page-break rules
+  - Target ~2 pages of the personalized clinical summary
+- Add "Print / Save as PDF" button on results that calls `window.print()`.
 
-- **🍽️ Feeding Plan** — Portion guidance, meal frequency, food type suggestions
-- **🧴 Grooming Routine** — Skin-fold cleaning schedule, bathing cadence, dental care
-- **🏃 Exercise Plan** — Daily activity recommendations, weather considerations
-- **⚠️ Health Watch-Outs** — Breed-specific concerns for their life stage
-- **💊 Supplement Suggestions** — Based on age and concerns
-- **🦮 Walking & Harness Tips** — If pulling was selected as a concern
+## 8. Cleanup / Wiring
+- `Index.tsx`: hydrate from store, persist on each state change, add `resetProfile()` to clear store.
+- Don't touch `create-payment` / Stripe / existing premium PDF generator — only add hooks.
+- No DB migrations needed.
 
-Each section includes a "Read More on Frenchy Fab" link pointing to real article URLs:
-- Grooming → frenchyfab.com/french-bulldog-grooming-blueprint/
-- Harness → frenchyfab.com/best-harness-for-french-bulldog-that-pulls/
-- Supplements → frenchyfab.com/essential-nutritional-supplements-french-bulldogs/
-- Treats → frenchyfab.com/french-bulldog-healthy-treats
+## Technical Notes
+- All clinical functions pure + covered by a small vitest spec (`src/test/clinical.test.ts`).
+- Strings carry citations: `"WSAVA NRC clinical equation"`, `"AVMA brachycephalic guidance"`.
+- Affiliate URLs use `https://` placeholders the user can swap; no real partner IDs invented.
+- No new secrets required; telehealth URL via Vite env with safe fallback.
 
-### Design System
-- **Background**: Warm cream (#F5E6D3)
-- **Primary**: Rich brown (#8B4513)
-- **Accent/CTA**: Terracotta (#D4956A)
-- **Text**: Dark brown (#2C1810)
-- **Cards**: White with soft shadows, rounded corners (12px)
-- **Font**: Friendly, readable sans-serif
-- Mobile-first responsive layout (optimized for the 375px viewport)
+## Files Touched (high level)
+- new: `src/lib/clinical.ts`, `src/lib/profileStore.ts`, `src/lib/icsGenerator.ts`, `src/lib/affiliateCatalog.ts`
+- new components: `CalorieCard`, `BoasScorecard`, `HeatStressMeter`, `UrgentVetBanner`, `AffiliateGrid`, `LeadGateModal`
+- edited: `src/index.css`, `tailwind.config.ts`, `src/lib/quizData.ts`, `src/pages/Index.tsx`, `src/components/ResultsScreen.tsx`, `src/components/QuizScreen.tsx`, `src/lib/revenueBackend.ts`
+- tests: `src/test/clinical.test.ts`
 
-### Technical Notes
-- All quiz logic and plan generation handled client-side (no backend needed for MVP)
-- Email capture stores to localStorage for now (can connect to Supabase later for real lead capture)
-- Plan content is template-based: predefined care recommendations mapped to quiz answer combinations
-
+Approve and I'll implement in one pass.
