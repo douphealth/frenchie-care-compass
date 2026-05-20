@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import LandingHero from '@/components/LandingHero';
 import QuizScreen from '@/components/QuizScreen';
@@ -10,6 +10,7 @@ import ExitIntentPopup from '@/components/ExitIntentPopup';
 import { quizSteps, QuizAnswers } from '@/lib/quizData';
 import { generatePlan, PlanSection } from '@/lib/planGenerator';
 import { generateAiPlan, submitLead, trackRevenueEvent } from '@/lib/revenueBackend';
+import { loadProfile, saveProfile, clearProfile } from '@/lib/profileStore';
 import { toast } from '@/hooks/use-toast';
 
 type Screen = 'landing' | 'quiz' | 'loading' | 'emailGate' | 'results' | 'upsell';
@@ -24,6 +25,28 @@ const Index = () => {
   const [answers, setAnswers] = useState<QuizAnswers>(defaultAnswers);
   const [email, setEmail] = useState('');
   const [plan, setPlan] = useState<PlanSection[]>([]);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Hydrate from localStorage once
+  useEffect(() => {
+    const stored = loadProfile();
+    if (stored.answers) setAnswers(stored.answers);
+    if (stored.email) setEmail(stored.email);
+    if (stored.plan) setPlan(stored.plan);
+    if (stored.plan && stored.answers && stored.email) {
+      setScreen('results');
+    } else if (stored.screen === 'quiz' && typeof stored.step === 'number') {
+      setScreen('quiz');
+      setStep(stored.step);
+    }
+    setHydrated(true);
+  }, []);
+
+  // Persist key state
+  useEffect(() => {
+    if (!hydrated) return;
+    saveProfile({ answers, email, plan, step, screen });
+  }, [answers, email, plan, step, screen, hydrated]);
 
   const currentStep = quizSteps[step];
 
@@ -32,17 +55,17 @@ const Index = () => {
     const val = answers[key];
     if (currentStep.type === 'multi') return Array.isArray(val) && val.length > 0;
     return !!val;
-  }, [step, answers, currentStep]);
+  }, [answers, currentStep]);
 
   const handleNext = async () => {
     if (step < quizSteps.length - 1) {
       setStep(s => s + 1);
     } else {
-      // Quiz complete — generate the best available plan.
-      // AI is a progressive enhancement; a deterministic care plan keeps the funnel resilient.
       setScreen('loading');
       const aiPlan = await generateAiPlan(answers);
-      setPlan(aiPlan || generatePlan(answers));
+      const finalPlan = aiPlan || generatePlan(answers);
+      setPlan(finalPlan);
+      saveProfile({ plan: finalPlan, completedAt: new Date().toISOString() });
       setScreen('emailGate');
     }
   };
@@ -58,6 +81,7 @@ const Index = () => {
     if (!normalizedEmail) return;
 
     localStorage.setItem('frenchie_email', normalizedEmail);
+    saveProfile({ email: normalizedEmail, leadCaptured: true });
 
     try {
       await submitLead({ email: normalizedEmail, answers, plan, source: 'frenchie-care-plan-app' });
@@ -65,7 +89,7 @@ const Index = () => {
         title: 'Your free plan is saved',
         description: 'We saved your Frenchie profile and unlocked your personalized care plan.',
       });
-    } catch (error) {
+    } catch {
       toast({
         title: 'Plan unlocked',
         description: 'Your plan is saved in this browser. We will retry lead sync when the backend is available.',
@@ -78,10 +102,12 @@ const Index = () => {
   };
 
   const handleStartOver = () => {
+    clearProfile();
     setScreen('landing');
     setStep(0);
     setAnswers(defaultAnswers);
     setEmail('');
+    setPlan([]);
   };
 
   return (
