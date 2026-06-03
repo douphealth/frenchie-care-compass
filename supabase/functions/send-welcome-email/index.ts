@@ -89,7 +89,7 @@ function buildWelcomeHTML(answers: Record<string, any>): string {
               </table>
               <table cellpadding="0" cellspacing="0" style="margin:20px auto 0;">
                 <tr><td style="background:#4c281e;border-radius:8px;padding:14px 36px;">
-                  <a href="https://frenchie-care-compass.lovable.app/?screen=upsell" style="color:#f5e6be;font-size:15px;font-weight:700;text-decoration:none;display:block;">
+                  <a href="https://care-plan.frenchyfab.com/?screen=upsell" style="color:#f5e6be;font-size:15px;font-weight:700;text-decoration:none;display:block;">
                     Get Premium PDF - Just $7.99
                   </a>
                 </td></tr>

@@ -142,9 +142,11 @@ serve(async (req) => {
 
   try {
     const { answers } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const AI_API_KEY = Deno.env.get("OPENAI_API_KEY") || Deno.env.get("AI_API_KEY");
+    const AI_BASE_URL = Deno.env.get("AI_BASE_URL") || "https://api.openai.com/v1/chat/completions";
+    const AI_MODEL = Deno.env.get("AI_MODEL") || "gpt-4o-mini";
+    if (!AI_API_KEY) {
+      throw new Error("OPENAI_API_KEY or AI_API_KEY is not configured");
     }
 
     const bcsInterpretation = answers.bodyCondition <= 3
@@ -182,14 +184,14 @@ PATIENT PROFILE:
 
 Generate the most thorough, clinically precise care plan possible. Each recommendation should feel like it came from a specialist consultation.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch(AI_BASE_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${AI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: AI_MODEL,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userPrompt },
