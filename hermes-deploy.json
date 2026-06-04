@@ -1,5 +1,5 @@
 {
-  "source_commit": "150edd7",
-  "deployed_at": "2026-06-04T09:20:13.461761Z",
-  "note": "FrenchyFab logo and favicon update"
+  "source_commit": "d88e5b4",
+  "deployed_at": "2026-06-04T09:31:35.622946Z",
+  "note": "Restore original app hero; use supplied square FrenchyFab icon as favicon/social image"
 }
