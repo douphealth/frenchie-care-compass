@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { PawPrint, Clock, Shield, Sparkles, Utensils, Activity, Droplets, Heart, AlertTriangle } from 'lucide-react';
-import frenchyFabLogo from '@/assets/frenchyfab-logo-wide.png';
+import frenchieHero from '@/assets/frenchie-hero.png';
 
 type Props = {
   onStart: () => void;
@@ -26,20 +26,20 @@ const audienceTags = ['Puppies', 'Adults', 'Seniors', 'First-time owners', 'Hot 
 const LandingHero = ({ onStart }: Props) => (
   <div className="min-h-screen flex flex-col items-center justify-center px-5 py-10 md:py-16">
     <div className="max-w-lg w-full text-center space-y-6">
-      {/* FrenchyFab brand logo */}
+      {/* Hero image */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.94 }}
+        initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-        className="relative mx-auto w-full max-w-sm"
+        className="relative mx-auto w-36 h-36 md:w-48 md:h-48"
       >
-        <div className="absolute inset-4 rounded-[2rem] bg-secondary/20 blur-3xl" />
+        <div className="absolute inset-0 rounded-full bg-secondary/20 blur-2xl" />
         <motion.img
-          src={frenchyFabLogo}
-          alt="FrenchyFab.com premium French Bulldog logo"
-          className="relative w-full rounded-[1.75rem] border border-premium-gold/40 shadow-2xl shadow-primary/20"
-          animate={{ y: [0, -4, 0] }}
-          transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+          src={frenchieHero}
+          alt="French Bulldog illustration"
+          className="relative w-full h-full object-contain drop-shadow-xl"
+          animate={{ y: [0, -8, 0] }}
+          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
         />
       </motion.div>
 
