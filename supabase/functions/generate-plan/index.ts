@@ -243,7 +243,7 @@ Generate a thorough, practical educational care plan. It must not present itself
     });
   } catch (error) {
     console.error("Plan generation error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Plan generation failed" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });
