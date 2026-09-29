@@ -11,7 +11,11 @@ function weightLabel(value: string) {
 }
 
 function cleanText(value: string) {
-  return value\n    .replace(/[\\u{1F300}-\\u{1FAFF}]/gu, '')\n    .replace(/[\\u{2600}-\\u{27BF}]/gu, '')\n    .replace(/\\s+/g, ' ')\n    .trim();
+  return value
+    .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
+    .replace(/[\u{2600}-\u{27BF}]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 export async function generateFreePDF(plan: PlanSection[], answers: QuizAnswers): Promise<void> {
