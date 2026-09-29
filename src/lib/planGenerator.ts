@@ -257,36 +257,36 @@ export function generatePlan(answers: QuizAnswers): PlanSection[] {
   supplements.items.push('Probiotics DAILY — Frenchies have sensitive stomachs; look for multi-strain formulas.');
 
   if (lifeStage === 'senior') {
-    supplements.items.push('Glucosamine + Chondroitin (500mg + 400mg daily) for joint support.');
-    supplements.items.push('Omega-3 fish oil (EPA+DHA) — 1000mg daily for coat, skin, brain, and joint health.');
-    supplements.items.push('CoQ10 (30–60mg daily) for heart health — common need in aging Frenchies.');
+    supplements.items.push('Discuss joint-support options such as glucosamine/chondroitin with your veterinarian; suitability and dosing depend on the product and your dog\'s health.');
+    supplements.items.push('Ask your veterinarian whether an EPA/DHA omega-3 supplement is appropriate and what product-specific dose fits your Frenchie.');
+    supplements.items.push('Do not add cardiac supplements such as CoQ10 without veterinary guidance, especially if your Frenchie takes prescription medication.');
     supplements.items.push('Consider SAMe for liver support if on long-term medications.');
   } else if (lifeStage === 'puppy') {
     supplements.items.push('DHA supplement if not already in puppy food — critical for brain development.');
-    supplements.items.push('Omega-3 fish oil (500mg daily) for coat development.');
+    supplements.items.push('If considering omega-3 for a puppy, confirm the formulation and dose with your veterinarian so it complements the complete puppy diet.');
     supplements.items.push('Avoid calcium supplements unless prescribed — excess calcium causes skeletal issues.');
   } else {
-    supplements.items.push('Omega-3 fish oil (750–1000mg daily) for a glossy coat and skin barrier.');
+    supplements.items.push('If considering omega-3 for skin or coat support, confirm an EPA/DHA product and weight-appropriate dose with your veterinarian.');
   }
 
   if (concern === 'skin') {
-    supplements.items.push('Quercetin (natural antihistamine) — 25mg per lb body weight, twice daily. Confirm with vet.');
-    supplements.items.push('Vitamin E (100–200 IU daily) supports skin healing.');
+    supplements.items.push('Do not use quercetin as a substitute for allergy diagnosis or treatment; ask your veterinarian before adding it or any antihistamine-like supplement.');
+    supplements.items.push('Vitamin E needs vary with diet and other supplements; confirm whether additional vitamin E is appropriate with your veterinarian.');
     supplements.items.push('Consider colostrum supplements for immune-mediated skin issues.');
   }
 
   if (concern === 'breathing') {
     supplements.items.push('Maintain lean body weight — single most impactful thing for breathing.');
-    supplements.items.push('Bromelain (natural anti-inflammatory) may help reduce airway swelling — ask your vet.');
+    supplements.items.push('Breathing difficulty requires veterinary assessment; do not rely on supplements such as bromelain to treat airway obstruction.');
   }
 
   if (concern === 'diet') {
-    supplements.items.push('Digestive enzymes with meals can improve nutrient absorption.');
+    supplements.items.push('Digestive enzymes are not routinely necessary for healthy dogs; use them only when your veterinarian identifies a reason.');
     supplements.items.push('Pumpkin puree (1–2 tbsp per meal) for fiber and digestive regularity.');
   }
 
   if (bodyCondition >= 7) {
-    supplements.items.push('L-Carnitine supports fat metabolism — helpful for weight management.');
+    supplements.items.push('For weight management, prioritize measured calories and veterinary guidance rather than adding L-carnitine unless specifically recommended.');
   }
 
   sections.push(supplements);
