@@ -3,6 +3,15 @@ import { PlanSection } from './planGenerator';
 
 const KEY = 'frenchie_profile_v1';
 
+export type PremiumEntitlement = {
+  status: 'paid';
+  sessionId: string;
+  verifiedAt: string;
+  amountTotal?: number | null;
+  currency?: string | null;
+  email?: string | null;
+};
+
 export type StoredProfile = {
   answers?: QuizAnswers;
   plan?: PlanSection[];
@@ -11,6 +20,7 @@ export type StoredProfile = {
   screen?: string;
   leadCaptured?: boolean;
   completedAt?: string;
+  premium?: PremiumEntitlement;
 };
 
 export function loadProfile(): StoredProfile {
