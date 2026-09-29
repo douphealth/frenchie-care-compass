@@ -1,65 +1,74 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@18.5.0";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import Stripe from "npm:stripe@22.0.0";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const APP_ORIGIN = (Deno.env.get("APP_ORIGIN") || "https://care-plan.frenchyfab.com").replace(/\/$/, "");
+const PREMIUM_PRICE_ID = Deno.env.get("STRIPE_PREMIUM_PRICE_ID") || "price_1TFD07GCqwm95OGXc26k5JkI";
+const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY") || "";
+
+function corsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  const allowOrigin = origin === APP_ORIGIN || origin.startsWith("http://localhost:") ? origin : APP_ORIGIN;
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
+}
+
+function json(req: Request, body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders(req), "Content-Type": "application/json", "Cache-Control": "no-store" },
+  });
+}
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
+  if (req.method !== "POST") return json(req, { error: "Method not allowed" }, 405);
+  if (!STRIPE_SECRET_KEY) return json(req, { error: "Payment service is not configured" }, 503);
 
   try {
-    const { email, addBump } = await req.json();
+    const body = await req.json();
+    const email = String(body?.email || "").trim().toLowerCase();
+    const answers = body?.answers;
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2025-08-27.basil",
-    });
-
-    // Check for existing customer
-    let customerId: string | undefined;
-    if (email) {
-      const customers = await stripe.customers.list({ email, limit: 1 });
-      if (customers.data.length > 0) {
-        customerId = customers.data[0].id;
-      }
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+      return json(req, { error: "A valid email is required" }, 400);
+    }
+    if (!answers || typeof answers !== "object") {
+      return json(req, { error: "Frenchie profile is required" }, 400);
     }
 
-    const lineItems = [
-      {
-        price: "price_1TFD07GCqwm95OGXc26k5JkI",
-        quantity: 1,
-      },
-    ];
-
-    if (addBump) {
-      lineItems.push({
-        price: "price_1THjRhGCqwm95OGXJZf9x553",
-        quantity: 1,
-      });
+    const serializedAnswers = JSON.stringify(answers);
+    if (serializedAnswers.length > 450) {
+      return json(req, { error: "Profile payload is too large" }, 400);
     }
+
+    const stripe = new Stripe(STRIPE_SECRET_KEY);
+    const customers = await stripe.customers.list({ email, limit: 1 });
+    const customerId = customers.data[0]?.id;
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : email,
-      line_items: lineItems,
+      line_items: [{ price: PREMIUM_PRICE_ID, quantity: 1 }],
       mode: "payment",
-      success_url: `${req.headers.get("origin")}/payment-success`,
-      cancel_url: `${req.headers.get("origin")}/?screen=upsell`,
+      allow_promotion_codes: true,
+      billing_address_collection: "auto",
+      success_url: APP_ORIGIN + "/payment-success?session_id={CHECKOUT_SESSION_ID}",
+      cancel_url: APP_ORIGIN + "/?checkout=cancelled",
+      metadata: {
+        product: "frenchie-care-vault",
+        answers: serializedAnswers,
+        fulfillment_email_sent: "false",
+      },
     });
 
-    return new Response(JSON.stringify({ url: session.url }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    if (!session.url) return json(req, { error: "Stripe did not return a checkout URL" }, 502);
+    return json(req, { url: session.url });
   } catch (error) {
-    console.error("Payment error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    console.error("create-payment failed", error);
+    return json(req, { error: "Unable to open secure checkout" }, 500);
   }
 });
