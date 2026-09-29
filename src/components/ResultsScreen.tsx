@@ -5,7 +5,7 @@ import { RefreshCcw, Share2, Download, Star, Shield, Award, Printer, CalendarPlu
 import PlanResults from './PlanResults';
 import { PlanSection } from '@/lib/planGenerator';
 import { QuizAnswers } from '@/lib/quizData';
-import { generatePDF } from '@/lib/pdfGenerator';
+import { generateFreePDF } from '@/lib/freePdfGenerator';
 import ProfileCard from './results/ProfileCard';
 import LockedModules from './results/LockedModules';
 import CalorieCard from './results/CalorieCard';
@@ -47,7 +47,7 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
   };
 
   const runDownloadPdf = async () => {
-    await generatePDF(plan, answers);
+    await generateFreePDF(plan, answers);
   };
 
   const runDownloadIcs = () => {
@@ -153,7 +153,7 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
               className="h-12 rounded-xl font-bold gap-2 border-2"
             >
               <Download className="w-4 h-4" />
-              Free PDF
+              Free Summary PDF
             </Button>
             <Button
               onClick={() => window.print()}
