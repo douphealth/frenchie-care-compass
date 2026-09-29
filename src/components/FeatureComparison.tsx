@@ -1,30 +1,21 @@
-import { motion } from 'framer-motion';
 import { Check, X, Crown } from 'lucide-react';
 
 const features = [
-  { name: 'Personalized care plan', free: true, premium: true },
-  { name: 'Feeding recommendations', free: true, premium: true },
-  { name: 'Grooming routine', free: true, premium: true },
-  { name: 'Exercise guidelines', free: true, premium: true },
-  { name: 'Custom feeding charts & portions', free: false, premium: true },
+  { name: 'Personalized care dashboard', free: true, premium: true },
+  { name: 'Core feeding guidance', free: true, premium: true },
+  { name: 'Core grooming guidance', free: true, premium: true },
+  { name: 'Core exercise guidance', free: true, premium: true },
+  { name: 'Concise free PDF summary', free: true, premium: true },
+  { name: 'Custom feeding chart & portions', free: false, premium: true },
   { name: 'Printable grooming checklist', free: false, premium: true },
   { name: 'Seasonal care calendar', free: false, premium: true },
-  { name: 'Vet visit prep sheets', free: false, premium: true },
-  { name: 'Emergency red-flag checklist', free: false, premium: true },
-  { name: '"When to call the vet" guide', free: false, premium: true },
-  { name: 'Product recommendations', free: false, premium: true },
-  { name: '12+ page premium PDF', free: false, premium: true },
-  { name: 'Lifetime updates', free: false, premium: true },
+  { name: 'Vet-visit prep sheets', free: false, premium: true },
+  { name: 'Emergency red-flag reference', free: false, premium: true },
+  { name: 'Extended premium PDF', free: false, premium: true },
 ];
 
 const FeatureComparison = () => (
-  <motion.div
-    initial={{ opacity: 0, y: 16 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.5 }}
-    className="glass-card rounded-2xl overflow-hidden"
-  >
-    {/* Header */}
+  <div className="glass-card rounded-2xl overflow-hidden">
     <div className="grid grid-cols-3 text-center">
       <div className="p-3" />
       <div className="p-3 bg-muted/30">
@@ -37,34 +28,22 @@ const FeatureComparison = () => (
         </div>
       </div>
     </div>
-
-    {/* Rows */}
     <div className="divide-y divide-border/50">
-      {features.map((f, i) => (
-        <motion.div
-          key={i}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: i * 0.03 }}
-          className="grid grid-cols-3 items-center"
-        >
+      {features.map((feature) => (
+        <div key={feature.name} className="grid grid-cols-3 items-center">
           <div className="px-4 py-2.5">
-            <span className="text-xs font-semibold text-foreground/80">{f.name}</span>
+            <span className="text-xs font-semibold text-foreground/80">{feature.name}</span>
           </div>
           <div className="flex justify-center py-2.5 bg-muted/10">
-            {f.free ? (
-              <Check className="w-4 h-4 text-emerald-500" />
-            ) : (
-              <X className="w-4 h-4 text-muted-foreground/30" />
-            )}
+            {feature.free ? <Check className="w-4 h-4 text-emerald-500" /> : <X className="w-4 h-4 text-muted-foreground/30" />}
           </div>
           <div className="flex justify-center py-2.5 bg-amber-50/30">
             <Check className="w-4 h-4 text-emerald-500" />
           </div>
-        </motion.div>
+        </div>
       ))}
     </div>
-  </motion.div>
+  </div>
 );
 
 export default FeatureComparison;

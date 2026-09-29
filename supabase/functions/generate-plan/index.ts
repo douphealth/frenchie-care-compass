@@ -11,13 +11,13 @@ const ICON_MAP: Record<string, string> = {
   SUPPLEMENTS: '💊', ENVIRONMENT: '🏠', LEASH: '🦮', WELLNESS: '💚',
 };
 
-const SYSTEM_PROMPT = `You are a board-certified veterinary nutritionist and French Bulldog breed specialist with 20+ years of clinical experience. You write care plans that rival those from top veterinary hospitals (e.g., Cornell, UC Davis, Royal Veterinary College).
+const SYSTEM_PROMPT = `You are a safety-first educational assistant focused on French Bulldog care. Do not claim veterinary credentials, diagnosis authority, or personal clinical experience. Provide practical breed-aware guidance and clearly distinguish general education from advice that requires a veterinarian.
 
 YOUR WRITING STYLE:
 - Professional yet warm — like a trusted vet who genuinely cares
 - Every sentence must deliver specific, actionable value
 - Use precise numbers: exact calorie ranges, gram-level supplement dosages, minute-level exercise durations
-- Reference peer-reviewed veterinary science where relevant (e.g., "Per AAFCO 2024 guidelines..." or "Studies in the Journal of Veterinary Internal Medicine show...")
+- Never invent citations, studies, guidelines, or authority claims. If a recommendation depends on a medical diagnosis, prescription, supplement dose, or individual disease status, tell the owner to confirm it with their veterinarian.
 - Structure each recommendation as: WHAT to do + WHY it matters + HOW to implement
 - Avoid vague advice like "feed a good diet" — instead say exactly what, how much, how often
 
@@ -69,7 +69,7 @@ QUALITY STANDARDS:
 - Each section MUST have exactly 5 detailed recommendations (no more, no less)
 - Keep each recommendation to 2 sentences maximum
 - Every calorie/portion number must be mathematically derived from the dog's weight and life stage
-- Supplement dosages must be weight-appropriate (mg per kg or per lb)
+- Avoid presenting supplement doses as universally safe prescriptions. If dose ranges are mentioned, label them as discussion points for the veterinarian and include contraindication cautions.
 - Exercise recommendations must account for brachycephalic airway compromise
 - Include at least one "red flag" warning sign per health section item where relevant`;
 
@@ -182,7 +182,7 @@ PATIENT PROFILE:
       'Cold climate (hypothermia risk, paw protection needed)'
     ).join('; ') : 'Not specified'}
 
-Generate the most thorough, clinically precise care plan possible. Each recommendation should feel like it came from a specialist consultation.`;
+Generate a thorough, practical educational care plan. It must not present itself as a veterinary diagnosis or specialist consultation.`;
 
     const response = await fetch(AI_BASE_URL, {
       method: "POST",
@@ -243,7 +243,7 @@ Generate the most thorough, clinically precise care plan possible. Each recommen
     });
   } catch (error) {
     console.error("Plan generation error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Plan generation failed" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });

@@ -14,12 +14,29 @@ export type LeadPayload = {
 
 export type CheckoutPayload = {
   email: string;
-  addBump: boolean;
+  answers: QuizAnswers;
+};
+
+export type CheckoutPricing = {
+  unitAmount: number;
+  currency: string;
+  formatted: string;
+};
+
+export type PaymentVerification = {
+  paid: boolean;
+  status: string;
+  paymentStatus: string;
+  refunded: boolean;
+  email?: string | null;
+  amountTotal?: number | null;
+  currency?: string | null;
+  answers?: QuizAnswers | null;
 };
 
 function withTimeout<T>(promise: Promise<T>, ms = BACKEND_TIMEOUT_MS): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timeout = window.setTimeout(() => reject(new Error(`Request timed out after ${ms}ms`)), ms);
+    const timeout = window.setTimeout(() => reject(new Error('Request timed out after ' + ms + 'ms')), ms);
     promise.then(
       (value) => {
         window.clearTimeout(timeout);
@@ -62,7 +79,7 @@ export function trackRevenueEvent(event: string, properties: Record<string, unkn
 }
 
 async function postToWordPress(path: string, body: Record<string, unknown>) {
-  const response = await withTimeout(fetch(`${WP_ENDPOINT}${path}`, {
+  const response = await withTimeout(fetch(WP_ENDPOINT + path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -76,7 +93,7 @@ async function postToWordPress(path: string, body: Record<string, unknown>) {
 
   const json = await response.json().catch(() => ({}));
   if (!response.ok || json?.success === false) {
-    throw new Error(json?.message || `WordPress endpoint failed with ${response.status}`);
+    throw new Error(json?.message || 'WordPress endpoint failed with ' + response.status);
   }
   return json;
 }
@@ -99,20 +116,16 @@ export async function generateAiPlan(answers: QuizAnswers): Promise<PlanSection[
 export async function submitLead(payload: LeadPayload) {
   trackRevenueEvent('email_submitted', { email_domain: payload.email.split('@')[1] || '' });
 
-  // Primary durable lead capture lives on FrenchyFab WordPress so this funnel is not blocked
-  // if the old Supabase project is paused/deleted.
   try {
     const data = await postToWordPress('/lead', payload as unknown as Record<string, unknown>);
     localStorage.setItem('ffab_care_lead_id', String(data.id || data.lead_id || 'wp'));
     trackRevenueEvent('lead_saved', { backend: 'wordpress', lead_id: data.id || data.lead_id });
   } catch (wpError) {
-    // Never lose the lead locally; mark for later recovery and continue with the free result.
     localStorage.setItem('ffab_pending_lead', JSON.stringify({ ...payload, saved_at: new Date().toISOString() }));
     trackRevenueEvent('lead_save_failed', { backend: 'wordpress', error: String(wpError) });
     throw wpError;
   }
 
-  // Secondary best-effort email automation. Kept as progressive enhancement only.
   supabase.functions.invoke('send-welcome-email', {
     body: { email: payload.email, answers: payload.answers },
   }).then(() => {
@@ -122,20 +135,46 @@ export async function submitLead(payload: LeadPayload) {
   });
 }
 
+export async function getCheckoutPricing(): Promise<CheckoutPricing> {
+  const { data, error } = await withTimeout(
+    supabase.functions.invoke('get-pricing', { body: {} })
+  );
+  if (error || !data?.unitAmount || !data?.currency) {
+    throw error || new Error('Pricing unavailable');
+  }
+  return {
+    unitAmount: Number(data.unitAmount),
+    currency: String(data.currency),
+    formatted: String(data.formatted || '$7.99'),
+  };
+}
+
 export async function createCheckout(payload: CheckoutPayload): Promise<string> {
-  trackRevenueEvent('premium_cta_clicked', { add_bump: payload.addBump });
+  trackRevenueEvent('premium_cta_clicked');
 
   try {
     const { data, error } = await withTimeout(
       supabase.functions.invoke('create-payment', { body: payload })
     );
     if (error || !data?.url) throw error || new Error('Checkout URL missing');
-    trackRevenueEvent('checkout_created', { backend: 'supabase', add_bump: payload.addBump });
+    trackRevenueEvent('checkout_created', { backend: 'supabase' });
     return data.url;
   } catch (error) {
     trackRevenueEvent('checkout_backend_failed', { backend: 'supabase', error: String(error) });
-    await postToWordPress('/checkout-intent', payload as unknown as Record<string, unknown>);
-    trackRevenueEvent('checkout_intent_saved', { backend: 'wordpress', add_bump: payload.addBump });
+    try {
+      await postToWordPress('/checkout-intent', payload as unknown as Record<string, unknown>);
+      trackRevenueEvent('checkout_intent_saved', { backend: 'wordpress' });
+    } catch {
+      /* best effort only */
+    }
     throw error;
   }
+}
+
+export async function verifyCheckout(sessionId: string): Promise<PaymentVerification> {
+  const { data, error } = await withTimeout(
+    supabase.functions.invoke('verify-payment', { body: { sessionId } })
+  );
+  if (error || !data) throw error || new Error('Payment verification failed');
+  return data as PaymentVerification;
 }
