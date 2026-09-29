@@ -151,7 +151,7 @@ const Index = () => {
           )}
 
           {screen === 'upsell' && (
-            <PremiumUpsell onSkip={() => setScreen('results')} />
+            <PremiumUpsell answers={answers} onSkip={() => setScreen('results')} />
           )}
         </motion.div>
       </AnimatePresence>
