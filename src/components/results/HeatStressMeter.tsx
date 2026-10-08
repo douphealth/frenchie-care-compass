@@ -12,10 +12,10 @@ const zoneColor: Record<HeatZone, string> = {
 };
 
 const zoneLabel: Record<HeatZone, string> = {
-  safe: 'Safe',
-  caution: 'Caution',
-  danger: 'Danger',
-  emergency: 'Emergency',
+  safe: 'Monitor conditions',
+  caution: 'Take precautions',
+  danger: 'Avoid strenuous activity',
+  emergency: 'Emergency symptoms require a vet',
 };
 
 type Props = { onZoneChange?: (z: HeatZone) => void };
@@ -41,9 +41,9 @@ const HeatStressMeter = ({ onZoneChange }: Props) => {
         </div>
         <div>
           <h3 className="font-black text-foreground font-display text-lg leading-tight">
-            Heat-Stress Meter
+            Warm-weather planning
           </h3>
-          <p className="text-xs text-muted-foreground">Flat-faced breeds overheat fast</p>
+          <p className="text-xs text-muted-foreground">Example temperatures, not live weather or a diagnosis</p>
         </div>
       </div>
 
@@ -56,8 +56,7 @@ const HeatStressMeter = ({ onZoneChange }: Props) => {
             <div className="absolute inset-x-0 bottom-[40%] h-[20%] bg-warning/40" />
             <div className="absolute inset-x-0 bottom-[60%] h-[10%] bg-orange-500/50" />
             <div className="absolute inset-x-0 bottom-[70%] h-[30%] bg-destructive/50" />
-            {/* 80°F absolute limit marker */}
-            <div className="absolute inset-x-0 bottom-[60%] h-0.5 bg-destructive" />
+            {/* Temperature is only one input; there is no universal safe cutoff. */}
             {/* Mercury fill */}
             <motion.div
               className={`absolute inset-x-0 bottom-0 ${zoneColor[risk.zone]}`}
@@ -70,12 +69,12 @@ const HeatStressMeter = ({ onZoneChange }: Props) => {
 
         <div className="flex-1 space-y-3">
           <div className="flex items-baseline justify-between">
-            <span className="text-xs font-bold uppercase text-muted-foreground">Current temp</span>
+            <span className="text-xs font-bold uppercase text-muted-foreground">Example temperature</span>
             <span className="text-2xl font-black text-foreground">{tempF}°F</span>
           </div>
           <Slider value={[tempF]} onValueChange={(v) => setTempF(v[0])} min={50} max={100} step={1} />
           <div className="flex justify-between text-[10px] text-muted-foreground">
-            <span>50°F</span><span>80°F limit</span><span>100°F</span>
+            <span>50°F</span><span>80°F</span><span>100°F</span>
           </div>
 
           <div className={`rounded-xl p-3 text-xs font-semibold border-2 ${
@@ -85,16 +84,17 @@ const HeatStressMeter = ({ onZoneChange }: Props) => {
             : 'bg-destructive/15 text-destructive border-destructive/40'
           }`}>
             <div className="font-black uppercase tracking-wide text-[10px] mb-1">
-              Zone: {zoneLabel[risk.zone]}
+              Guidance: {zoneLabel[risk.zone]}
             </div>
             {risk.message}
           </div>
         </div>
       </div>
 
+      <p className="mt-3 text-xs text-muted-foreground">Check your dog's breathing and behavior, not only the air temperature. Heavy panting, weakness, confusion, collapse or unusual gum color require prompt veterinary attention.</p>
       <div className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-1 rounded-full">
         <BookOpen className="w-3 h-3" />
-        {risk.citation}
+        <a href="https://avma.org/resources/pet-owners/petcare/warm-weather-pet-safety" target="_blank" rel="noopener noreferrer" className="underline">{risk.citation}</a>
       </div>
     </motion.div>
   );
