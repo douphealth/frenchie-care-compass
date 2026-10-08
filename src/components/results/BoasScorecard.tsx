@@ -22,8 +22,8 @@ type Props = {
 };
 
 const BoasScorecard = ({ onLevelChange }: Props) => {
-  const [sound, setSound] = useState<BreathingSound>('snoring');
-  const [tolerance, setTolerance] = useState(6);
+  const [sound, setSound] = useState<BreathingSound>('quiet');
+  const [tolerance, setTolerance] = useState(8);
   const [heatIntolerance, setHeatIntolerance] = useState(false);
 
   const result = useMemo(
@@ -35,9 +35,9 @@ const BoasScorecard = ({ onLevelChange }: Props) => {
   useEffect(() => { onLevelChange?.(result.level); }, [result.level, onLevelChange]);
 
   const levelLabel =
-    result.level === 'urgent' ? 'Urgent Action Required'
-    : result.level === 'moderate' ? 'Moderate Risk'
-    : 'Low Risk';
+    result.level === 'urgent' ? 'Seek emergency veterinary care'
+    : result.level === 'moderate' ? 'Discuss these signs with your veterinarian'
+    : 'No concerns reported here';
 
   return (
     <motion.div
@@ -52,9 +52,9 @@ const BoasScorecard = ({ onLevelChange }: Props) => {
         </div>
         <div>
           <h3 className="font-black text-foreground font-display text-lg leading-tight">
-            BOAS Breathing Scorecard
+            Breathing observation checklist
           </h3>
-          <p className="text-xs text-muted-foreground">Interactive — map your dog's symptoms</p>
+          <p className="text-xs text-muted-foreground">Record observations for your vet; this is not a BOAS grade</p>
         </div>
       </div>
 
@@ -103,18 +103,23 @@ const BoasScorecard = ({ onLevelChange }: Props) => {
         <div className={`rounded-xl border-2 p-3 ${levelStyles[result.level]}`}>
           <div className="flex items-center justify-between mb-1">
             <span className="font-black text-sm uppercase tracking-wide">{levelLabel}</span>
-            <span className="font-black text-xl">{result.score}</span>
+            
           </div>
-          {result.reasons.length > 0 && (
+          {result.reasons.length > 0 ? (
             <ul className="text-xs space-y-0.5 opacity-90">
               {result.reasons.map((r) => <li key={r}>• {r}</li>)}
             </ul>
+          ) : (
+            <p className="text-xs">This checklist cannot rule out BOAS. Ask your vet about noisy breathing or reduced exercise tolerance.</p>
+          )}
+          {result.level === 'urgent' && (
+            <p className="text-xs font-bold mt-2">If your dog is struggling to breathe, collapsing or has blue/gray gums, seek emergency veterinary care now.</p>
           )}
         </div>
 
         <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-1 rounded-full">
           <BookOpen className="w-3 h-3" />
-          {result.citation}
+          <a href="https://www.vet.cam.ac.uk/boas/about-boas/recognition-diagnosis" target="_blank" rel="noopener noreferrer" className="underline">{result.citation}</a>
         </div>
       </div>
     </motion.div>

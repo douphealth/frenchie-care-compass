@@ -29,16 +29,16 @@ type GateAction = 'pdf' | 'ics' | null;
 
 const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
   const [boasLevel, setBoasLevel] = useState<'low' | 'moderate' | 'urgent'>('low');
-  const [heatZone, setHeatZone] = useState<'safe' | 'caution' | 'danger' | 'emergency'>('safe');
+
   const [gate, setGate] = useState<GateAction>(null);
 
   const stored = useMemo(() => loadProfile(), []);
   const hasLead = !!stored.leadCaptured || !!stored.email;
 
   const urgentReason =
-    boasLevel === 'urgent' ? 'Your Frenchie\'s breathing scorecard is in the urgent range.'
-    : heatZone === 'emergency' ? 'Current temperature is in the emergency zone for flat-faced breeds.'
-    : null;
+    boasLevel === 'urgent'
+      ? 'You reported that your Frenchie is struggling to breathe.'
+      : null;
 
   const handleShare = async () => {
     if (navigator.share) {
@@ -97,7 +97,7 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
 
           <div className="flex items-center justify-center gap-3 mt-3 no-print">
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
-              <Shield className="w-3.5 h-3.5 text-success" /> Vet-Informed
+              <Shield className="w-3.5 h-3.5 text-success" /> General care guidance
             </span>
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
               <Award className="w-3.5 h-3.5 text-warning" /> Breed-Specific
@@ -115,7 +115,7 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
         <div className="space-y-4 mt-5">
           <CalorieCard answers={answers} />
           <BoasScorecard onLevelChange={setBoasLevel} />
-          <HeatStressMeter onZoneChange={setHeatZone} />
+          <HeatStressMeter />
         </div>
 
         {/* Plan sections divider */}
