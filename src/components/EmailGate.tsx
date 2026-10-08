@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { CheckCircle2, Mail, Lock, Users, Sparkles } from 'lucide-react';
+import { CheckCircle2, Mail, Lock } from 'lucide-react';
 import PlanResults from './PlanResults';
 import { PlanSection } from '@/lib/planGenerator';
 
@@ -37,7 +37,7 @@ const EmailGate = ({ plan, email, setEmail, onSubmit }: Props) => (
         </p>
         <div className="flex items-center justify-center gap-3">
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-full">
-            <Sparkles className="w-3 h-3 text-amber-500" /> AI-Personalized
+            <CheckCircle2 className="w-3 h-3 text-amber-500" /> Based on your answers
           </span>
         </div>
       </motion.div>
@@ -72,7 +72,7 @@ const EmailGate = ({ plan, email, setEmail, onSubmit }: Props) => (
           </div>
           <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1"><Lock className="w-3 h-3" /> No spam ever</span>
-            <span className="flex items-center gap-1"><Users className="w-3 h-3" /> 10K+ Frenchie owners</span>
+            <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> You control your care notes</span>
           </div>
         </motion.form>
       </div>
