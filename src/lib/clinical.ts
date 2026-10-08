@@ -1,17 +1,15 @@
 import { QuizAnswers } from './quizData';
 
 /**
- * Clinical engine for Frenchie Care Compass.
- * All math is pure and citation-backed:
- *  - MER: WSAVA / NRC 2006 clinical equation (K * BWkg^0.75)
- *  - BOAS risk grading inspired by Cambridge BOAS functional grading
- *  - Heat-stress thresholds: AVMA + ACVECC brachycephalic guidance
+ * Owner-facing educational estimates and observation tools.
+ * These do not diagnose BOAS, heat illness or an individual dog's energy needs.
+ * Clinical assessment and treatment decisions belong to a veterinarian.
  */
 
 export const CITATIONS = {
-  mer: 'Formula: WSAVA / NRC clinical equation',
-  boas: 'Inspired by Cambridge BOAS functional grading',
-  heat: 'AVMA brachycephalic heat-stress guidance',
+  mer: 'WSAVA: energy needs are individual estimates',
+  boas: 'Cambridge BOAS: functional grading requires veterinary assessment',
+  heat: 'AVMA: watch the dog and conditions, not only the temperature',
 };
 
 /* ------------------------- Weight & K factor ------------------------- */
@@ -90,47 +88,75 @@ export function buildMER(answers: QuizAnswers, opts?: { neutered?: boolean; kcal
   };
 }
 
-/* ------------------------- BOAS ------------------------- */
+/* ------------------------- Breathing observations ------------------------- */
 
+/** Educational symptom checklist; this is NOT a BOAS test or veterinary grade. */
 export type BreathingSound = 'quiet' | 'snoring' | 'raspy' | 'struggling';
 export type BoasLevel = 'low' | 'moderate' | 'urgent';
 
 export type BoasInput = {
   sound: BreathingSound;
-  exerciseTolerance: number; // 0 (none) – 10 (excellent)
+  exerciseTolerance: number; // Self-reported 0 (poor) - 10 (excellent).
   heatIntolerance: boolean;
 };
 
 export type BoasResult = {
   level: BoasLevel;
-  score: number; // 0-100
   reasons: string[];
   citation: string;
 };
 
 export function boasScore(i: BoasInput): BoasResult {
-  let score = 0;
   const reasons: string[] = [];
-  const soundScore = { quiet: 0, snoring: 25, raspy: 55, struggling: 90 }[i.sound];
-  score += soundScore;
-  if (soundScore >= 25) reasons.push(`Breathing sound: ${i.sound}`);
-  const intolerance = Math.max(0, 10 - i.exerciseTolerance);
-  score += intolerance * 4;
-  if (intolerance >= 5) reasons.push('Low exercise tolerance');
-  if (i.heatIntolerance) { score += 15; reasons.push('Heat intolerance reported'); }
+  if (i.sound !== 'quiet') reasons.push('Breathing noise or difficulty reported');
+  if (i.exerciseTolerance <= 5) reasons.push('Reduced exercise tolerance reported');
+  if (i.heatIntolerance) reasons.push('Heat intolerance reported');
 
-  score = Math.min(100, Math.round(score));
-  const level: BoasLevel = score >= 70 ? 'urgent' : score >= 35 ? 'moderate' : 'low';
-  return { level, score, reasons, citation: CITATIONS.boas };
+  // Struggling to breathe is an emergency sign, regardless of other answers.
+  if (i.sound === 'struggling') {
+    return {
+      level: 'urgent',
+      reasons: [...reasons, 'Seek emergency veterinary care now if breathing is difficult.'],
+      citation: CITATIONS.boas,
+    };
+  }
+
+  return {
+    level: reasons.length > 0 ? 'moderate' : 'low',
+    reasons,
+    citation: CITATIONS.boas,
+  };
 }
 
-/* ------------------------- Heat stress ------------------------- */
+/* ------------------------- Temperature planning ------------------------- */
 
+/**
+ * A temperature-only planning hint, NOT a heatstroke diagnostic or safety limit.
+ * Exercise, humidity, sun, health, acclimation and clinical signs change risk.
+ */
 export type HeatZone = 'safe' | 'caution' | 'danger' | 'emergency';
 
 export function heatRisk(tempF: number): { zone: HeatZone; message: string; citation: string } {
-  if (tempF >= 85) return { zone: 'emergency', message: 'Emergency: keep your Frenchie indoors with AC. Brachycephalic dogs cannot thermoregulate above 85°F.', citation: CITATIONS.heat };
-  if (tempF >= 80) return { zone: 'danger', message: 'Danger zone: 80°F is the absolute outdoor limit for flat-faced breeds. Walks only at dawn/dusk, on grass.', citation: CITATIONS.heat };
-  if (tempF >= 70) return { zone: 'caution', message: 'Caution: shorten walks, carry water, watch for excessive panting.', citation: CITATIONS.heat };
-  return { zone: 'safe', message: 'Safe range for outdoor activity. Still avoid hot pavement.', citation: CITATIONS.heat };
+  if (!Number.isFinite(tempF)) {
+    return { zone: 'caution', message: 'Check your local conditions and watch your dog for signs of overheating.', citation: CITATIONS.heat };
+  }
+  if (tempF >= 80) {
+    return {
+      zone: 'danger',
+      message: 'Warm conditions call for extra caution. Avoid strenuous exercise, provide cool shelter and water, and watch for excessive panting, weakness or altered behavior. Temperature alone cannot diagnose heatstroke.',
+      citation: CITATIONS.heat,
+    };
+  }
+  if (tempF >= 70) {
+    return {
+      zone: 'caution',
+      message: 'Consider shorter, gentler outings and check humidity, sunshine, pavement and your dog\'s breathing. Seek veterinary advice if symptoms develop.',
+      citation: CITATIONS.heat,
+    };
+  }
+  return {
+    zone: 'safe',
+    message: 'A lower reading does not guarantee safety. Watch your dog, especially during exercise or with breathing problems.',
+    citation: CITATIONS.heat,
+  };
 }
