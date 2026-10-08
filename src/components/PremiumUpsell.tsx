@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Crown, FileText, CheckCircle2, Star, Download, Sparkles, Loader2, Clock, ShieldCheck, Zap } from 'lucide-react';
+import { Crown, FileText, CheckCircle2, Download, Loader2, ShieldCheck, Zap } from 'lucide-react';
 import { useState } from 'react';
 import { createCheckout } from '@/lib/revenueBackend';
 import FeatureComparison from './FeatureComparison';
@@ -12,8 +12,8 @@ type Props = {
 
 const vaultFeatures = [
   'Personalized daily routine & weekly care schedule',
-  'Custom feeding charts with exact calorie & portion targets',
-  'Breed-specific exercise boundaries & warning flags',
+  'Editable feeding notes and estimated portion planning',
+  'Breed-specific activity precautions and warning signs',
   'Skin, wrinkle & ear care cadence with product picks',
   'Seasonal heat/cold adjustment calendar',
   'Vet visit prep sheets by life stage',
@@ -21,7 +21,7 @@ const vaultFeatures = [
   '"When to call the vet" decision guide',
   'Printable grooming & feeding checklists',
   'Beautifully designed 12+ page PDF',
-  'Lifetime updates as your Frenchie grows',
+  'Keep a copy of your personalized guide',
 ];
 
 const PremiumUpsell = ({ onSkip }: Props) => {
@@ -36,7 +36,7 @@ const PremiumUpsell = ({ onSkip }: Props) => {
       window.location.href = checkoutUrl;
     } catch (err) {
       console.error('Checkout error:', err);
-      alert('Checkout is being refreshed. We saved your upgrade request and will follow up with access details. You can keep using the free plan now.');
+      alert('Checkout could not be opened. No purchase has been confirmed. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -64,7 +64,7 @@ const PremiumUpsell = ({ onSkip }: Props) => {
           Unlock the Frenchie Care Vault
         </h2>
         <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-          Get the complete breed-specific care operating system — avoid costly mistakes, build the right routine, and keep your Frenchie healthy.
+          Get the complete breed-specific care operating system — avoid costly mistakes, organize care routines, track useful observations, and prepare for veterinary visits.
         </p>
       </motion.div>
 
@@ -76,9 +76,9 @@ const PremiumUpsell = ({ onSkip }: Props) => {
         className="flex items-center justify-center gap-3 mb-6"
       >
         {[
-          { icon: ShieldCheck, text: 'Vet-Informed' },
+          { icon: ShieldCheck, text: 'For everyday planning' },
           { icon: Zap, text: 'Instant Access' },
-          { icon: Sparkles, text: 'AI-Personalized' },
+          { icon: CheckCircle2, text: 'Based on your answers' },
         ].map(({ icon: Icon, text }) => (
           <div key={text} className="flex items-center gap-1 text-[11px] font-bold text-muted-foreground">
             <Icon className="w-3.5 h-3.5 text-secondary" />
@@ -103,11 +103,7 @@ const PremiumUpsell = ({ onSkip }: Props) => {
                 <div key={i} className="h-2 rounded-full bg-muted" style={{ width: `${w}%` }} />
               ))}
             </div>
-            <div className="flex gap-1 mt-2">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className="w-4 h-4 fill-premium-gold text-premium-gold" />
-              ))}
-            </div>
+
             <span className="text-xs text-muted-foreground">12+ Pages · Personalized · Printable</span>
           </div>
         </div>
@@ -193,19 +189,6 @@ const PremiumUpsell = ({ onSkip }: Props) => {
         </button>
       </motion.div>
 
-      {/* Urgency banner */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4, delay: 0.35 }}
-        className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-destructive/10 border border-destructive/20 mb-6"
-      >
-        <Clock className="w-4 h-4 text-destructive" />
-        <p className="text-xs font-bold text-destructive">
-          Launch price — increases to $14.99 soon
-        </p>
-      </motion.div>
-
       {/* Social Proof */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
@@ -239,11 +222,11 @@ const PremiumUpsell = ({ onSkip }: Props) => {
           <div className="flex items-center justify-center gap-2 mt-3 py-2 px-4 rounded-lg bg-emerald-50 border border-emerald-200/50">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
             <p className="text-xs font-bold text-emerald-700">
-              100% Money-Back Guarantee — No questions asked
+              Check the product description and purchase terms before paying
             </p>
           </div>
           <p className="text-center text-xs text-muted-foreground mt-2">
-            One-time payment · Instant download · No subscription · Yours forever
+            One-time purchase · Delivery follows successful payment verification
           </p>
         </motion.div>
 
