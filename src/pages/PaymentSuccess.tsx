@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Download, PartyPopper } from 'lucide-react';
+import { Download, PartyPopper } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const PaymentSuccess = () => {
@@ -14,7 +14,7 @@ const PaymentSuccess = () => {
         transition={{ type: 'spring', stiffness: 300, damping: 20 }}
         className="w-20 h-20 rounded-full bg-success/20 flex items-center justify-center mb-6"
       >
-        <CheckCircle2 className="w-10 h-10 text-success" />
+        <PartyPopper className="w-10 h-10 text-success" />
       </motion.div>
 
       <motion.div
@@ -25,10 +25,10 @@ const PaymentSuccess = () => {
       >
         <h1 className="text-2xl md:text-3xl font-black text-foreground font-display flex items-center justify-center gap-2">
           <PartyPopper className="w-7 h-7 text-premium-gold" />
-          Payment Successful!
+          Checkout returned — verification pending
         </h1>
         <p className="text-muted-foreground text-sm max-w-sm">
-          Thank you for your purchase! Your premium Frenchie Care Guide PDF will be sent to your email shortly.
+          This page cannot verify a payment or guarantee PDF delivery. If you paid, keep your Stripe receipt. Please contact support before making another purchase; we're validating the secure delivery service.
         </p>
       </motion.div>
 
