@@ -1,0 +1,13 @@
+{
+  "name": "frenchyfab-careplan-selfhosted-proxy",
+  "main": "dist-worker/careplan-worker.js",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": false,
+  "observability": {
+    "enabled": true,
+    "traces": { "enabled": true }
+  },
+  "vars": {
+    "BREVO_LIST_ID": "8"
+  }
+}

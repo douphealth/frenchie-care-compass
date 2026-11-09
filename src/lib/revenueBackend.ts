@@ -5,7 +5,7 @@ import { Entitlement, acceptServerVerification } from './entitlement';
 import { PAYMENT_LINKS } from './stripeConfig';
 import { isValidEmail, normalizeEmail } from './quizValidation';
 
-const WP_ENDPOINT = 'https://frenchyfab.com/wp-json/ffab-care/v1';
+const WP_ENDPOINT = 'https://care-plan.frenchyfab.com/api/ffab-care/v1';
 const BACKEND_TIMEOUT_MS = 9000;
 
 export type LeadPayload = {

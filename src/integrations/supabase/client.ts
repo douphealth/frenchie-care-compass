@@ -2,7 +2,9 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://zyxsijqazzhuudhmfitw.supabase.co";
+// The Supabase project behind this URL no longer resolves. Function calls go to
+// the care-plan Worker, which implements /functions/v1/* on this host.
+const SUPABASE_URL = "https://care-plan.frenchyfab.com";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5eHNpanFhenpodXVkaG1maXR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MjI3MDcsImV4cCI6MjA5MDA5ODcwN30.6Hhf8LVpZzGc1_iJDSMsqTNKR9tj2PyesE-mimx7Mlw";
 
 // Import the supabase client like this:
