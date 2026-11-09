@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { parseQuizAnswers } from "../../../src/lib/quizValidation.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,15 +12,15 @@ const ICON_MAP: Record<string, string> = {
   SUPPLEMENTS: '💊', ENVIRONMENT: '🏠', LEASH: '🦮', WELLNESS: '💚',
 };
 
-const SYSTEM_PROMPT = `You are a board-certified veterinary nutritionist and French Bulldog breed specialist with 20+ years of clinical experience. You write care plans that rival those from top veterinary hospitals (e.g., Cornell, UC Davis, Royal Veterinary College).
+const SYSTEM_PROMPT = `You write educational French Bulldog care notes for dog owners. You are not a veterinarian, and you must not pretend to be one or to represent any veterinary school.
 
 YOUR WRITING STYLE:
-- Professional yet warm — like a trusted vet who genuinely cares
-- Every sentence must deliver specific, actionable value
-- Use precise numbers: exact calorie ranges, gram-level supplement dosages, minute-level exercise durations
-- Reference peer-reviewed veterinary science where relevant (e.g., "Per AAFCO 2024 guidelines..." or "Studies in the Journal of Veterinary Internal Medicine show...")
-- Structure each recommendation as: WHAT to do + WHY it matters + HOW to implement
-- Avoid vague advice like "feed a good diet" — instead say exactly what, how much, how often
+- Warm and practical
+- Use the calorie estimate supplied in the profile when you mention food energy. Do not invent a second, conflicting number.
+- Do not invent study citations, journal names, or statistics
+- Do not prescribe drugs or give milligram doses for supplements or human medications. Tell the owner to ask their veterinarian.
+- Structure each recommendation as: WHAT to do + WHY it matters for this breed + WHEN to call a vet
+- Avoid vague advice like "feed a good diet"
 
 FORMATTING RULES:
 - Return ONLY valid JSON — no markdown, no code fences, no commentary
@@ -55,8 +56,8 @@ REQUIRED SECTIONS (in this order):
    Include: breed-specific screening schedule (BOAS grading, patella evaluation, spine imaging for IVDD, ophthalmologic exam, cardiac auscultation), vaccination protocol, warning signs requiring emergency vet, dental cleaning frequency.
    articleLink: { label: "Essential Supplements for French Bulldogs", url: "https://frenchyfab.com/essential-nutritional-supplements-french-bulldogs/" }
 
-5. icon: "SUPPLEMENTS", title: "Evidence-Based Supplement Protocol"
-   Include: specific supplements with exact mg dosages per body weight, brand-agnostic formulation guidance, timing (with meals vs. empty stomach), contraindications, expected timeline for visible results.
+5. icon: "SUPPLEMENTS", title: "Supplement Questions for Your Vet"
+   Include: which topics are worth asking about (omega-3, joint support, probiotics). Do not give milligram doses. Say that a veterinarian must choose the product and the dose.
 
 6. icon: "ENVIRONMENT", title: "Home Environment & Safety" (only if environment data provided)
    Include: indoor temperature range, humidity targets, toxic plant list, pool/stair safety, seasonal adjustments, travel considerations.
@@ -69,11 +70,11 @@ QUALITY STANDARDS:
 - Each section MUST have exactly 5 detailed recommendations (no more, no less)
 - Keep each recommendation to 2 sentences maximum
 - Every calorie/portion number must be mathematically derived from the dog's weight and life stage
-- Supplement dosages must be weight-appropriate (mg per kg or per lb)
+- Do not include drug or supplement milligram doses
 - Exercise recommendations must account for brachycephalic airway compromise
 - Include at least one "red flag" warning sign per health section item where relevant`;
 
-function extractJsonFromResponse(response: string): any {
+function extractJsonFromResponse(response: string): { sections: unknown[] } {
   let cleaned = response
     .replace(/```json\s*/gi, "")
     .replace(/```\s*/g, "")
@@ -99,7 +100,12 @@ function extractJsonFromResponse(response: string): any {
   cleaned = cleaned
     .replace(/,\s*}/g, "}")
     .replace(/,\s*]/g, "]")
-    .replace(/[\x00-\x1F\x7F]/g, (c) => c === "\n" || c === "\t" ? c : "");
+    .split("")
+    .filter((char) => {
+      const code = char.charCodeAt(0);
+      return code === 9 || code === 10 || code === 13 || code >= 32;
+    })
+    .join("");
 
   try {
     return JSON.parse(cleaned);
@@ -141,7 +147,14 @@ serve(async (req) => {
   }
 
   try {
-    const { answers } = await req.json();
+    const body = await req.json();
+    const answers = parseQuizAnswers(body?.answers);
+    if (!answers) {
+      return new Response(JSON.stringify({ error: "Quiz answers were missing or not recognized." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const AI_API_KEY = Deno.env.get("OPENAI_API_KEY") || Deno.env.get("AI_API_KEY");
     const AI_BASE_URL = Deno.env.get("AI_BASE_URL") || "https://api.openai.com/v1/chat/completions";
     const AI_MODEL = Deno.env.get("AI_MODEL") || "gpt-4o-mini";
@@ -182,7 +195,7 @@ PATIENT PROFILE:
       'Cold climate (hypothermia risk, paw protection needed)'
     ).join('; ') : 'Not specified'}
 
-Generate the most thorough, clinically precise care plan possible. Each recommendation should feel like it came from a specialist consultation.`;
+Write practical owner notes. Do not claim these notes are a veterinary diagnosis or a hospital consult.`;
 
     const response = await fetch(AI_BASE_URL, {
       method: "POST",
@@ -228,10 +241,10 @@ Generate the most thorough, clinically precise care plan possible. Each recommen
     const planData = extractJsonFromResponse(content);
 
     // Map icon codes to emoji and sanitize
-    const sections = planData.sections.map((s: any) => ({
+    const sections = (planData.sections as Array<{ icon?: string; title?: string; items?: string[]; articleLink?: { label: string; url: string } }>).map((s) => ({
       icon: ICON_MAP[s.icon] || ICON_MAP[s.icon?.toUpperCase()] || '📋',
       title: s.title,
-      items: s.items.map((item: string) => 
+      items: (s.items || []).map((item: string) => 
         item.replace(/[\u{1F600}-\u{1F6FF}\u{2600}-\u{27BF}\u{1F900}-\u{1F9FF}]/gu, '').trim()
       ),
       articleLink: s.articleLink || undefined,
@@ -243,7 +256,7 @@ Generate the most thorough, clinically precise care plan possible. Each recommen
     });
   } catch (error) {
     console.error("Plan generation error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: "Plan generation failed" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });

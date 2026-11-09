@@ -1,6 +1,8 @@
 import jsPDF from 'jspdf';
 import { PlanSection } from './planGenerator';
 import { QuizAnswers } from './quizData';
+import { buildMER } from './clinical';
+import { includedPremiumPages, PdfTier } from './pdfOutline';
 import frenchieHeroUrl from '@/assets/frenchie-hero.png';
 import frenchieFaceUrl from '@/assets/frenchie-face.png';
 import pawIconUrl from '@/assets/paw-icon.png';
@@ -139,33 +141,15 @@ function stripEmoji(str: string): string {
     .trim();
 }
 
-/* ── Feeding calculation helpers ── */
-function getCalories(w: string, stage: string, bc: number): { min: number; max: number } {
-  const weights: Record<string, [number, number]> = { under20: [10, 19], '20-28': [20, 28], over28: [29, 38] };
-  const [wMin, wMax] = weights[w] || [20, 28];
-  let calPerLb = 30;
-  if (stage === 'puppy') calPerLb = 40;
-  else if (stage === 'senior') calPerLb = 25;
-  if (bc > 6) calPerLb -= 5;
-  if (bc < 4) calPerLb += 5;
-  return { min: wMin * calPerLb, max: wMax * calPerLb };
-}
-
 function getMealsPerDay(stage: string): number { return stage === 'puppy' ? 3 : 2; }
 
-function getPortionPerMeal(w: string, stage: string, bc: number): { cups: string; grams: string } {
-  const cal = getCalories(w, stage, bc);
-  const avgCal = (cal.min + cal.max) / 2;
-  const meals = getMealsPerDay(stage);
-  const cupsPerMeal = avgCal / meals / 350; // ~350 cal per cup kibble
-  const gramsPerMeal = cupsPerMeal * 113; // ~113g per cup
-  return {
-    cups: `${cupsPerMeal.toFixed(1)} cups`,
-    grams: `${Math.round(gramsPerMeal)}g`,
-  };
-}
-
-export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Promise<void> {
+export async function generatePDF(
+  plan: PlanSection[],
+  answers: QuizAnswers,
+  options?: { tier?: PdfTier; includeEmergencyCard?: boolean },
+): Promise<void> {
+  const tier: PdfTier = options?.tier === 'premium' ? 'premium' : 'free';
+  const premiumPages = new Set(includedPremiumPages(tier, Boolean(options?.includeEmergencyCard)));
   // Load images — hero as PNG (transparent, for dark cover bg), others as JPEG
   const [heroImgPng, heroImg, faceImg, pawImg] = await Promise.all([
     loadImageAsPng(frenchieHeroUrl, 400),
@@ -411,7 +395,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   doc.setFontSize(9);
   doc.setTextColor(...C.goldLight);
   doc.setFont('helvetica', 'normal');
-  doc.text('Breed-Specific  •  Vet-Informed  •  Tailored to Your Dog', pw / 2, 68, { align: 'center' });
+  doc.text('Breed-specific  •  Educational  •  Tailored to your answers', pw / 2, 68, { align: 'center' });
 
   // Hero Frenchie image on cover — PNG with transparency for dark background
   try {
@@ -456,7 +440,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
 
   const colX1 = cardMx + 10;
   const colX2 = pw / 2 + 6;
-  let profileY = cardY + 20;
+  const profileY = cardY + 20;
 
   doc.setFontSize(7.5);
   profileData.forEach((item, i) => {
@@ -481,7 +465,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   const badgeY = 234;
   const bw = (contentW - 28) / 3;
   const badges: { label: string; sub: string; color: readonly [number, number, number]; bg: readonly [number, number, number] }[] = [
-    { label: 'Vet-Informed', sub: 'Science-backed', color: C.emerald, bg: C.emeraldBg },
+    { label: 'Educational', sub: 'Not a diagnosis', color: C.emerald, bg: C.emeraldBg },
     { label: 'Breed-Specific', sub: 'BOAS-aware', color: C.sky, bg: C.skyBg },
     { label: 'Personalized', sub: 'Tailored for you', color: C.terracotta, bg: C.orangeBg },
   ];
@@ -548,7 +532,8 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
     y += 16;
   });
 
-  // Bonus pages listing
+  // Bonus pages listing — omitted from the free PDF
+  if (premiumPages.size > 0) {
   y += 4;
   const bonusPages = [
     { label: 'Custom Feeding Chart & Portions', color: C.orange },
@@ -574,6 +559,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
     doc.text(bp.label, mx + 12, y + 3.5);
     y += 8;
   });
+  }
 
   // Quick stats
   y += 6;
@@ -587,7 +573,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   const statsData = [
     { label: 'Sections', value: `${plan.length}` },
     { label: 'Recommendations', value: `${totalItems}` },
-    { label: 'Bonus Pages', value: '5' },
+    { label: 'Bonus Pages', value: `${premiumPages.size}` },
     { label: 'Updated', value: today.split(',')[0] },
   ];
   const statW = contentW / 4;
@@ -633,7 +619,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
 
     section.items.forEach((item, j) => {
       const isWarning = item.includes('WARNING') || item.startsWith('\u26A0');
-      const cleanItem = item.replace(/^[\u26A0\uFE0F\s]+/, '');
+      const cleanItem = item.replace(/^(?:⚠️\s*)+/, '');
       drawItemCard(cleanItem, isWarning, j, sIdx);
     });
 
@@ -647,6 +633,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   /* ═══════════════════════════════════════════════
    * CUSTOM FEEDING CHART & PORTIONS PAGE
    * ═══════════════════════════════════════════════ */
+  if (premiumPages.has('feeding-chart')) {
   doc.addPage();
   newPageBg();
   y = 20;
@@ -654,9 +641,10 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   drawPageTitle('Custom Feeding Chart & Portions', C.orange);
 
   // Personalized calorie summary
-  const cal = getCalories(answers.weight, answers.lifeStage, answers.bodyCondition);
+  const mer = buildMER(answers);
   const meals = getMealsPerDay(answers.lifeStage);
-  const portion = getPortionPerMeal(answers.weight, answers.lifeStage, answers.bodyCondition);
+  const perMealCups = Math.round((mer.cupsPerDay / meals) * 4) / 4;
+  const portion = { cups: `${perMealCups} cups`, grams: `${Math.round(perMealCups * 113)}g` };
 
   doc.setFillColor(...C.orangeBg);
   doc.roundedRect(mx, y, contentW, 24, 3, 3, 'F');
@@ -670,7 +658,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   doc.setFontSize(8);
   doc.setTextColor(...C.text);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Daily Calories: ${cal.min}-${cal.max} kcal  |  Meals/Day: ${meals}  |  Per Meal: ~${portion.cups} (~${portion.grams})`, mx + 6, y + 15);
+  doc.text(`Estimated energy: about ${mer.kcalPerDay} kcal/day  |  Meals/Day: ${meals}  |  Per Meal: ~${portion.cups} (~${portion.grams})`, mx + 6, y + 15);
   doc.text(`Based on: ${stageLabel(answers.lifeStage)}, ${weightLabel(answers.weight)}, Body Score ${answers.bodyCondition}/9, ${activityLabel(answers.activityLevel)} activity`, mx + 6, y + 21);
   y += 30;
 
@@ -731,7 +719,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   doc.text('Daily Treat Allowance (10% Rule)', mx, y + 4);
   y += 10;
 
-  const treatCal = Math.round((cal.min + cal.max) / 2 * 0.1);
+  const treatCal = Math.round(mer.kcalPerDay * 0.1);
   const safeTreats = [
     ['Blueberries (5-6)', `~${Math.round(treatCal * 0.15)} kcal`, 'Antioxidants, vitamins'],
     ['Baby carrot sticks (2-3)', `~${Math.round(treatCal * 0.1)} kcal`, 'Low cal, dental health'],
@@ -769,7 +757,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   const toxicFoods = [
     'Chocolate (theobromine toxicity)  |  Grapes & Raisins (kidney failure)  |  Onions & Garlic (hemolytic anemia)',
     'Xylitol / artificial sweeteners  |  Macadamia nuts  |  Cooked bones (splintering risk)',
-    'Avocado (persin toxicity)  |  Alcohol  |  Caffeine  |  Raw yeast dough',
+    'Avocado pit, skin, and leaves  |  Alcohol  |  Caffeine  |  Raw yeast dough',
   ];
   toxicFoods.forEach((line, i) => {
     doc.text(line, mx + 8, y + 14 + i * 6);
@@ -777,10 +765,12 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   y += 40;
 
   addFooter();
+  }
 
   /* ═══════════════════════════════════════════════
    * PRINTABLE GROOMING CHECKLIST PAGE
    * ═══════════════════════════════════════════════ */
+  if (premiumPages.has('grooming-checklist')) {
   doc.addPage();
   newPageBg();
   y = 20;
@@ -880,10 +870,12 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   });
 
   addFooter();
+  }
 
   /* ═══════════════════════════════════════════════
    * SEASONAL CARE CALENDAR PAGE
    * ═══════════════════════════════════════════════ */
+  if (premiumPages.has('seasonal-calendar')) {
   doc.addPage();
   newPageBg();
   y = 20;
@@ -998,10 +990,12 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   doc.text('PRO TIP: Set monthly calendar reminders for flea/tick treatment, nail trims, and weigh-ins.', mx + 6, y + 9);
 
   addFooter();
+  }
 
   /* ═══════════════════════════════════════════════
    * VET VISIT PREP SHEETS PAGE
    * ═══════════════════════════════════════════════ */
+  if (premiumPages.has('vet-prep')) {
   doc.addPage();
   newPageBg();
   y = 20;
@@ -1123,10 +1117,12 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   }
 
   addFooter();
+  }
 
   /* ═══════════════════════════════════════════════
    * WEEKLY CARE CHECKLIST PAGE
    * ═══════════════════════════════════════════════ */
+  if (premiumPages.has('weekly-checklist')) {
   doc.addPage();
   newPageBg();
   y = 20;
@@ -1192,10 +1188,12 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   });
 
   addFooter();
+  }
 
   /* ═══════════════════════════════════════════════
    * EMERGENCY QUICK REFERENCE PAGE
    * ═══════════════════════════════════════════════ */
+  if (premiumPages.has('emergency-reference')) {
   doc.addPage();
   newPageBg();
   y = 20;
@@ -1205,7 +1203,7 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   const emergencies = [
     { title: 'Heatstroke', signs: 'Heavy panting, drooling, vomiting, wobbly gait', action: 'Move to shade/AC immediately. Apply cool (not cold) water to paws and belly. Rush to vet.' },
     { title: 'Choking / Breathing Crisis', signs: 'Blue tongue/gums, gagging, pawing at mouth', action: 'Check airway for obstruction. If visible, carefully remove. CPR if needed. Emergency vet immediately.' },
-    { title: 'Allergic Reaction', signs: 'Swollen face/eyes, hives, difficulty breathing', action: 'Remove allergen if known. Benadryl (1mg/lb) if mild. Emergency vet if breathing is affected.' },
+    { title: 'Allergic Reaction', signs: 'Swollen face/eyes, hives, difficulty breathing', action: 'Remove the trigger if you know it. Do not give human medication unless a veterinarian tells you the product and dose. Go to a vet if breathing changes.' },
     { title: 'Seizure', signs: 'Uncontrolled shaking, loss of consciousness, drooling', action: 'Do NOT restrain. Clear area of hazards. Time the seizure. Vet visit within 24 hours; emergency if > 3 min.' },
     { title: 'Poisoning', signs: 'Vomiting, diarrhea, lethargy, tremors', action: 'Note what was ingested. Call ASPCA Poison Control: (888) 426-4435. Do NOT induce vomiting unless directed.' },
     { title: 'IVDD / Back Injury', signs: 'Yelping when touched, reluctance to move, dragging legs', action: 'Restrict movement immediately. Carry (do not let walk). Emergency vet -- possible spinal emergency.' },
@@ -1261,6 +1259,33 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   doc.text('Your Vet: _______________________________  |  Emergency Vet: _______________________________', mx + 5, y + 17);
 
   addFooter();
+  }
+
+  if (premiumPages.has('emergency-fridge-card')) {
+    doc.addPage();
+    newPageBg();
+    y = 20;
+    drawPageTitle('Emergency Fridge Card', C.rose);
+    const fridgeLines = [
+      'Difficult breathing, blue gums, or collapse: emergency clinic now.',
+      'Heat distress: move indoors, room-temperature water on belly and paws, call a vet. No ice baths.',
+      'Possible poison: call ASPCA Animal Poison Control (888) 426-4435. Do not induce vomiting unless they say so.',
+      'Cannot walk or cries when lifted: limit movement and see an emergency vet.',
+      'Do not give human medication unless a veterinarian gives the product and the dose.',
+    ];
+    fridgeLines.forEach((line) => {
+      ensureSpace(18);
+      doc.setFillColor(...C.roseBg);
+      doc.roundedRect(mx, y, contentW, 14, 2, 2, 'F');
+      doc.setFontSize(9);
+      doc.setTextColor(...C.text);
+      doc.setFont('helvetica', 'bold');
+      const lines = doc.splitTextToSize(line, contentW - 10);
+      doc.text(lines, mx + 5, y + 6);
+      y += 18;
+    });
+    addFooter();
+  }
 
   /* ═══════════════════════════════════════════════
    * RESOURCES PAGE
@@ -1320,12 +1345,12 @@ export async function generatePDF(plan: PlanSection[], answers: QuizAnswers): Pr
   doc.setFontSize(10);
   doc.setTextColor(...C.emerald);
   doc.setFont('helvetica', 'bold');
-  doc.text('LIFETIME UPDATES INCLUDED', pw / 2, y + 8, { align: 'center' });
+  doc.text('RETAKE THE QUIZ ANYTIME', pw / 2, y + 8, { align: 'center' });
   doc.setFontSize(7.5);
   doc.setTextColor(...C.text);
   doc.setFont('helvetica', 'normal');
-  doc.text('Your premium plan includes free updates as our veterinary advisors add new recommendations.', pw / 2, y + 15, { align: 'center' });
-  doc.text('Re-take the quiz anytime at frenchyfab.com to get refreshed, up-to-date guidance.', pw / 2, y + 20, { align: 'center' });
+  doc.text('A new plan uses your latest answers. This file is not a subscription and it does not update itself.', pw / 2, y + 15, { align: 'center' });
+  doc.text('General guidance only. Ask your veterinarian before changing food, exercise, or medication.', pw / 2, y + 20, { align: 'center' });
 
   addFooter();
 

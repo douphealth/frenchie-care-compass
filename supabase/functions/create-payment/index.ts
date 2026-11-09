@@ -1,65 +1,38 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@18.5.0";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { json } from "../_shared/http.ts";
+import { createCheckoutSession } from "../_shared/stripeRest.ts";
+import { ALLOWED_APP_ORIGINS, APP_ORIGIN } from "../../../src/lib/stripeConfig.ts";
+import { isValidEmail, normalizeEmail, parseQuizAnswers } from "../../../src/lib/quizValidation.ts";
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: json(req, {}).headers });
+  if (req.method !== "POST") return json(req, { error: "Method not allowed" }, 405);
+
+  const secret = Deno.env.get("STRIPE_SECRET_KEY") || "";
+  if (!secret) return json(req, { error: "Payment service is not configured" }, 503);
 
   try {
-    const { email, addBump } = await req.json();
+    const body = await req.json();
+    const email = typeof body?.email === "string" ? normalizeEmail(body.email) : "";
+    if (!isValidEmail(email)) return json(req, { error: "A valid email is required" }, 400);
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2025-08-27.basil",
+    const answers = parseQuizAnswers(body?.answers);
+    if (!answers) return json(req, { error: "Frenchie profile is required" }, 400);
+    const addBump = body?.addBump === true;
+
+    const requestOrigin = req.headers.get("origin") || "";
+    const origin = ALLOWED_APP_ORIGINS.includes(requestOrigin) ? requestOrigin : APP_ORIGIN;
+
+    const session = await createCheckoutSession(secret, {
+      email,
+      origin,
+      addBump,
+      answersJson: JSON.stringify(answers),
     });
-
-    // Check for existing customer
-    let customerId: string | undefined;
-    if (email) {
-      const customers = await stripe.customers.list({ email, limit: 1 });
-      if (customers.data.length > 0) {
-        customerId = customers.data[0].id;
-      }
-    }
-
-    const lineItems = [
-      {
-        price: "price_1TFD07GCqwm95OGXc26k5JkI",
-        quantity: 1,
-      },
-    ];
-
-    if (addBump) {
-      lineItems.push({
-        price: "price_1THjRhGCqwm95OGXJZf9x553",
-        quantity: 1,
-      });
-    }
-
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      customer_email: customerId ? undefined : email,
-      line_items: lineItems,
-      mode: "payment",
-      success_url: `${req.headers.get("origin")}/payment-success`,
-      cancel_url: `${req.headers.get("origin")}/?screen=upsell`,
-    });
-
-    return new Response(JSON.stringify({ url: session.url }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    if (!session.url) return json(req, { error: "Stripe did not return a checkout URL" }, 502);
+    return json(req, { url: session.url });
   } catch (error) {
-    console.error("Payment error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    console.error("create-payment failed", error);
+    return json(req, { error: "Unable to open secure checkout" }, 500);
   }
 });

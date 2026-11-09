@@ -75,7 +75,7 @@ const HeatStressMeter = ({ onZoneChange }: Props) => {
           </div>
           <Slider value={[tempF]} onValueChange={(v) => setTempF(v[0])} min={50} max={100} step={1} />
           <div className="flex justify-between text-[10px] text-muted-foreground">
-            <span>50°F</span><span>80°F limit</span><span>100°F</span>
+            <span>50°F</span><span>80°F caution</span><span>100°F</span>
           </div>
 
           <div className={`rounded-xl p-3 text-xs font-semibold border-2 ${

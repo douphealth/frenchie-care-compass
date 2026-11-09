@@ -1,4 +1,5 @@
 import { QuizAnswers } from './quizData';
+import { buildMER } from './clinical';
 
 export type PlanSection = {
   icon: string;
@@ -13,27 +14,6 @@ function weightLbs(w: string): { min: number; max: number; label: string } {
   if (w === 'under20') return { min: 10, max: 19, label: 'under 20 lbs' };
   if (w === '20-28') return { min: 20, max: 28, label: '20–28 lbs' };
   return { min: 29, max: 38, label: 'over 28 lbs' };
-}
-
-function calorieRange(w: string, stage: string, bc: number): string {
-  const { min, max } = weightLbs(w);
-  let calPerLb = 30;
-  if (stage === 'puppy') calPerLb = 40;
-  else if (stage === 'senior') calPerLb = 25;
-  if (bc > 6) calPerLb -= 5;
-  if (bc < 4) calPerLb += 5;
-  return `${min * calPerLb}–${max * calPerLb} kcal/day`;
-}
-
-function portionCups(w: string, stage: string, bc: number): string {
-  const { min, max } = weightLbs(w);
-  const avgLbs = (min + max) / 2;
-  let cups = avgLbs / 15; // rough kibble calc
-  if (stage === 'puppy') cups *= 1.3;
-  if (stage === 'senior') cups *= 0.85;
-  if (bc > 6) cups *= 0.9;
-  if (bc < 4) cups *= 1.1;
-  return `${cups.toFixed(1)}–${(cups * 1.15).toFixed(1)} cups of kibble`;
 }
 
 function mealsPerDay(stage: string): number {
@@ -56,9 +36,9 @@ export function generatePlan(answers: QuizAnswers): PlanSection[] {
   const { lifeStage, weight, bodyCondition, concern, activityLevel, environment } = answers;
   const sections: PlanSection[] = [];
   const wt = weightLbs(weight);
-  const cals = calorieRange(weight, lifeStage, bodyCondition);
-  const cups = portionCups(weight, lifeStage, bodyCondition);
+  const mer = buildMER(answers);
   const meals = mealsPerDay(lifeStage);
+  const cupsPerMeal = (Math.round((mer.cupsPerDay / meals) * 4) / 4).toFixed(2).replace(/0$/, '').replace(/\.$/, '');
   const walk = walkMinutes(lifeStage, activityLevel);
 
   /* ── 1. FEEDING ── */
@@ -69,8 +49,8 @@ export function generatePlan(answers: QuizAnswers): PlanSection[] {
     articleLink: { label: 'Healthy Treats Guide', url: 'https://frenchyfab.com/french-bulldog-healthy-treats' },
   };
 
-  feeding.items.push(`Daily calorie target: ${cals} (based on ${wt.label}, body score ${bodyCondition}/9).`);
-  feeding.items.push(`Split into ${meals} meals per day — approximately ${cups} total.`);
+  feeding.items.push(`Estimated energy need: about ${mer.kcalPerDay} kcal/day for a typical ${wt.label} Frenchie at body score ${bodyCondition}/9 (${mer.kLabel}). Confirm against your food label and your veterinarian.`);
+  feeding.items.push(`Split into ${meals} meals — about ${mer.cupsPerDay} cups/day total if the food is 350 kcal per cup (about ${cupsPerMeal} cups per meal).`);
   feeding.items.push(`Look for food with ${proteinPct(lifeStage)} protein, named meat as the first ingredient.`);
 
   if (lifeStage === 'puppy') {
@@ -229,9 +209,9 @@ export function generatePlan(answers: QuizAnswers): PlanSection[] {
 
   if (concern === 'skin') {
     health.items.push('Ask your vet about intradermal allergy testing or serum allergy panels.');
-    health.items.push('Consider Omega-3 supplements (EPA/DHA) at 75–100mg per kg body weight.');
+    health.items.push('Ask your veterinarian about omega-3s for skin support. This guide does not set a milligram dose.');
     health.items.push('Cytopoint or Apoquel may help if allergies are severe — discuss with your vet.');
-    health.items.push('Interdigital cysts are common — soak paws in dilute chlorhexidine if redness appears.');
+    health.items.push('Redness between the toes is common. Ask your veterinarian before using an antiseptic soak.');
   }
 
   if (environment.includes('hot')) {
@@ -257,27 +237,23 @@ export function generatePlan(answers: QuizAnswers): PlanSection[] {
   supplements.items.push('Probiotics DAILY — Frenchies have sensitive stomachs; look for multi-strain formulas.');
 
   if (lifeStage === 'senior') {
-    supplements.items.push('Glucosamine + Chondroitin (500mg + 400mg daily) for joint support.');
-    supplements.items.push('Omega-3 fish oil (EPA+DHA) — 1000mg daily for coat, skin, brain, and joint health.');
-    supplements.items.push('CoQ10 (30–60mg daily) for heart health — common need in aging Frenchies.');
-    supplements.items.push('Consider SAMe for liver support if on long-term medications.');
+    supplements.items.push('Ask your veterinarian whether a joint supplement is appropriate, and what dose they want for this dog.');
+    supplements.items.push('Ask your veterinarian about an omega-3 (EPA/DHA) dose for coat, skin, and joints. Do not copy a milligram amount from a general article.');
+    supplements.items.push('Heart and liver supplements, including CoQ10 or SAMe, belong in a veterinary plan if your dog needs them.');
   } else if (lifeStage === 'puppy') {
-    supplements.items.push('DHA supplement if not already in puppy food — critical for brain development.');
-    supplements.items.push('Omega-3 fish oil (500mg daily) for coat development.');
-    supplements.items.push('Avoid calcium supplements unless prescribed — excess calcium causes skeletal issues.');
+    supplements.items.push('Choose a puppy food that already includes DHA unless your veterinarian recommends an added source.');
+    supplements.items.push('Ask your veterinarian before adding fish oil. Extra calcium can harm growing bones, so do not supplement calcium unless prescribed.');
   } else {
-    supplements.items.push('Omega-3 fish oil (750–1000mg daily) for a glossy coat and skin barrier.');
+    supplements.items.push('Ask your veterinarian about an omega-3 (EPA/DHA) dose before buying a bottle.');
   }
 
   if (concern === 'skin') {
-    supplements.items.push('Quercetin (natural antihistamine) — 25mg per lb body weight, twice daily. Confirm with vet.');
-    supplements.items.push('Vitamin E (100–200 IU daily) supports skin healing.');
-    supplements.items.push('Consider colostrum supplements for immune-mediated skin issues.');
+    supplements.items.push('Do not start quercetin, vitamin E, or other skin supplements from a fixed dose in this guide. Ask your veterinarian, especially if your dog already takes medication.');
   }
 
   if (concern === 'breathing') {
     supplements.items.push('Maintain lean body weight — single most impactful thing for breathing.');
-    supplements.items.push('Bromelain (natural anti-inflammatory) may help reduce airway swelling — ask your vet.');
+    supplements.items.push('Do not add anti-inflammatory supplements for breathing without a veterinary exam.');
   }
 
   if (concern === 'diet') {

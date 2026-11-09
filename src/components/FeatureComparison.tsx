@@ -12,9 +12,9 @@ const features = [
   { name: 'Vet visit prep sheets', free: false, premium: true },
   { name: 'Emergency red-flag checklist', free: false, premium: true },
   { name: '"When to call the vet" guide', free: false, premium: true },
-  { name: 'Product recommendations', free: false, premium: true },
-  { name: '12+ page premium PDF', free: false, premium: true },
-  { name: 'Lifetime updates', free: false, premium: true },
+  { name: 'Safety product notes', free: true, premium: true },
+  { name: 'Vault PDF with charts and checklists', free: false, premium: true },
+  { name: 'Emergency red-flag checklist', free: false, premium: true },
 ];
 
 const FeatureComparison = () => (

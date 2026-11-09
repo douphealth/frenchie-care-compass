@@ -1,17 +1,14 @@
 import { QuizAnswers } from './quizData';
 
 /**
- * Clinical engine for Frenchie Care Compass.
- * All math is pure and citation-backed:
- *  - MER: WSAVA / NRC 2006 clinical equation (K * BWkg^0.75)
- *  - BOAS risk grading inspired by Cambridge BOAS functional grading
- *  - Heat-stress thresholds: AVMA + ACVECC brachycephalic guidance
+ * Owner-facing estimates. These do not diagnose airway disease, heatstroke,
+ * or an individual dog's calorie need. A veterinarian has to examine the dog.
  */
 
 export const CITATIONS = {
-  mer: 'Formula: WSAVA / NRC clinical equation',
-  boas: 'Inspired by Cambridge BOAS functional grading',
-  heat: 'AVMA brachycephalic heat-stress guidance',
+  mer: 'WSAVA: energy needs are individual estimates',
+  boas: 'Cambridge BOAS grading requires a veterinary exam',
+  heat: 'AVMA: watch the dog and the conditions, not only the thermometer',
 };
 
 /* ------------------------- Weight & K factor ------------------------- */
@@ -103,25 +100,29 @@ export type BoasInput = {
 
 export type BoasResult = {
   level: BoasLevel;
-  score: number; // 0-100
   reasons: string[];
   citation: string;
 };
 
 export function boasScore(i: BoasInput): BoasResult {
-  let score = 0;
   const reasons: string[] = [];
-  const soundScore = { quiet: 0, snoring: 25, raspy: 55, struggling: 90 }[i.sound];
-  score += soundScore;
-  if (soundScore >= 25) reasons.push(`Breathing sound: ${i.sound}`);
-  const intolerance = Math.max(0, 10 - i.exerciseTolerance);
-  score += intolerance * 4;
-  if (intolerance >= 5) reasons.push('Low exercise tolerance');
-  if (i.heatIntolerance) { score += 15; reasons.push('Heat intolerance reported'); }
+  if (i.sound !== 'quiet') reasons.push(`Breathing sound reported: ${i.sound}`);
+  if (i.exerciseTolerance <= 5) reasons.push('Reduced exercise tolerance reported');
+  if (i.heatIntolerance) reasons.push('Heat intolerance reported');
 
-  score = Math.min(100, Math.round(score));
-  const level: BoasLevel = score >= 70 ? 'urgent' : score >= 35 ? 'moderate' : 'low';
-  return { level, score, reasons, citation: CITATIONS.boas };
+  if (i.sound === 'struggling') {
+    return {
+      level: 'urgent',
+      reasons: [...reasons, 'Difficult breathing needs emergency veterinary care, not a home score.'],
+      citation: CITATIONS.boas,
+    };
+  }
+
+  return {
+    level: reasons.length > 0 ? 'moderate' : 'low',
+    reasons,
+    citation: CITATIONS.boas,
+  };
 }
 
 /* ------------------------- Heat stress ------------------------- */
@@ -129,8 +130,33 @@ export function boasScore(i: BoasInput): BoasResult {
 export type HeatZone = 'safe' | 'caution' | 'danger' | 'emergency';
 
 export function heatRisk(tempF: number): { zone: HeatZone; message: string; citation: string } {
-  if (tempF >= 85) return { zone: 'emergency', message: 'Emergency: keep your Frenchie indoors with AC. Brachycephalic dogs cannot thermoregulate above 85°F.', citation: CITATIONS.heat };
-  if (tempF >= 80) return { zone: 'danger', message: 'Danger zone: 80°F is the absolute outdoor limit for flat-faced breeds. Walks only at dawn/dusk, on grass.', citation: CITATIONS.heat };
-  if (tempF >= 70) return { zone: 'caution', message: 'Caution: shorten walks, carry water, watch for excessive panting.', citation: CITATIONS.heat };
-  return { zone: 'safe', message: 'Safe range for outdoor activity. Still avoid hot pavement.', citation: CITATIONS.heat };
+  if (!Number.isFinite(tempF)) {
+    return { zone: 'caution', message: 'Check local conditions and watch your dog for heavy panting, weakness, or vomiting.', citation: CITATIONS.heat };
+  }
+  if (tempF >= 90) {
+    return {
+      zone: 'emergency',
+      message: 'Very hot conditions. Skip exercise. If your dog is panting heavily, weak, vomiting, or unsteady, cool them with room-temperature water and contact a veterinarian now. Temperature alone is not a diagnosis.',
+      citation: CITATIONS.heat,
+    };
+  }
+  if (tempF >= 80) {
+    return {
+      zone: 'danger',
+      message: 'Warm enough to skip hard exercise. Provide shade and water, and stop if panting becomes loud or your dog lags. There is no single temperature that is safe for every French Bulldog.',
+      citation: CITATIONS.heat,
+    };
+  }
+  if (tempF >= 70) {
+    return {
+      zone: 'caution',
+      message: 'Consider a shorter outing. Humidity, sun, and pavement still matter, and a cooler reading is not a guarantee.',
+      citation: CITATIONS.heat,
+    };
+  }
+  return {
+    zone: 'safe',
+    message: 'A lower temperature does not guarantee a safe outing. Watch breathing, especially during play.',
+    citation: CITATIONS.heat,
+  };
 }

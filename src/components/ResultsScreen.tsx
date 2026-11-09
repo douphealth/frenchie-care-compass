@@ -1,11 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { RefreshCcw, Share2, Download, Star, Shield, Award, Printer, CalendarPlus, ChevronRight } from 'lucide-react';
 import PlanResults from './PlanResults';
 import { PlanSection } from '@/lib/planGenerator';
 import { QuizAnswers } from '@/lib/quizData';
-import { generatePDF } from '@/lib/pdfGenerator';
 import ProfileCard from './results/ProfileCard';
 import LockedModules from './results/LockedModules';
 import CalorieCard from './results/CalorieCard';
@@ -15,7 +14,9 @@ import UrgentVetBanner from './results/UrgentVetBanner';
 import AffiliateGrid from './results/AffiliateGrid';
 import LeadGateModal from './LeadGateModal';
 import { buildIcs, downloadIcs } from '@/lib/icsGenerator';
-import { loadProfile } from '@/lib/profileStore';
+import { loadProfile, saveProfile } from '@/lib/profileStore';
+import { canAccessPremium, Entitlement } from '@/lib/entitlement';
+import { verifyCheckout } from '@/lib/revenueBackend';
 import { toast } from '@/hooks/use-toast';
 
 type Props = {
@@ -31,9 +32,31 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
   const [boasLevel, setBoasLevel] = useState<'low' | 'moderate' | 'urgent'>('low');
   const [heatZone, setHeatZone] = useState<'safe' | 'caution' | 'danger' | 'emergency'>('safe');
   const [gate, setGate] = useState<GateAction>(null);
+  const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
 
   const stored = useMemo(() => loadProfile(), []);
   const hasLead = !!stored.leadCaptured || !!stored.email;
+  const premium = canAccessPremium(entitlement);
+
+  useEffect(() => {
+    const sessionId = stored.entitlement?.sessionId;
+    if (!sessionId) return;
+    let cancelled = false;
+    verifyCheckout(sessionId)
+      .then((next) => {
+        if (cancelled) return;
+        if (next && canAccessPremium(next)) {
+          setEntitlement(next);
+          saveProfile({ entitlement: next });
+        } else {
+          saveProfile({ entitlement: undefined });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setEntitlement(null);
+      });
+    return () => { cancelled = true; };
+  }, [stored.entitlement?.sessionId]);
 
   const urgentReason =
     boasLevel === 'urgent' ? 'Your Frenchie\'s breathing scorecard is in the urgent range.'
@@ -41,13 +64,17 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
     : null;
 
   const handleShare = async () => {
-    if (navigator.share) {
+    if (typeof navigator.share === 'function') {
       await navigator.share({ title: 'My Frenchie Care Plan', text: 'Check out my personalized French Bulldog care plan!', url: window.location.href });
     }
   };
 
   const runDownloadPdf = async () => {
-    await generatePDF(plan, answers);
+    const { generatePDF } = await import('@/lib/pdfGenerator');
+    await generatePDF(plan, answers, {
+      tier: premium ? 'premium' : 'free',
+      includeEmergencyCard: Boolean(entitlement?.includeEmergencyCard),
+    });
   };
 
   const runDownloadIcs = () => {
@@ -97,7 +124,7 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
 
           <div className="flex items-center justify-center gap-3 mt-3 no-print">
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
-              <Shield className="w-3.5 h-3.5 text-success" /> Vet-Informed
+              <Shield className="w-3.5 h-3.5 text-success" /> Educational
             </span>
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
               <Award className="w-3.5 h-3.5 text-warning" /> Breed-Specific
@@ -134,7 +161,7 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
         <AffiliateGrid answers={answers} />
 
         {/* Locked Premium Modules Preview */}
-        <div className="no-print"><LockedModules onUpgrade={onUpgrade} /></div>
+        <div className="no-print"><LockedModules onUpgrade={onUpgrade} unlocked={premium} answers={answers} /></div>
 
         {/* Action buttons (lead-gated) */}
         <div className="no-print mt-6 grid grid-cols-1 gap-3">
@@ -153,7 +180,7 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
               className="h-12 rounded-xl font-bold gap-2 border-2"
             >
               <Download className="w-4 h-4" />
-              Free PDF
+              {premium ? 'Vault PDF' : 'Free PDF'}
             </Button>
             <Button
               onClick={() => window.print()}
@@ -202,7 +229,7 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
             <RefreshCcw className="w-4 h-4" />
             Start Over
           </Button>
-          {typeof navigator !== 'undefined' && (navigator as any).share && (
+          {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
             <Button onClick={handleShare} variant="outline" className="rounded-xl gap-2 h-11">
               <Share2 className="w-4 h-4" />
               Share Plan
