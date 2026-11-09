@@ -1,5 +1,15 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.2";
+import { isValidEmail, normalizeEmail } from "../../../src/lib/quizValidation.ts";
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,12 +26,15 @@ const RESEND_API_KEY = rawResendApiKey
   .replace(/,$/, "");
 const FROM_EMAIL = "FrenchyFab <hello@frenchyfab.com>";
 
-function buildWelcomeHTML(answers: Record<string, any>): string {
-  const stage = answers.lifeStage === 'puppy' ? 'Puppy' : answers.lifeStage === 'senior' ? 'Senior' : 'Adult';
-  const concern = {
-    skin: 'Skin & Allergies', pulling: 'Leash Pulling', diet: 'Diet & Weight',
-    breathing: 'Breathing', wellness: 'General Wellness',
-  }[answers.concern as string] || answers.concern || 'General Wellness';
+function buildWelcomeHTML(answers: Record<string, unknown>): string {
+  const lifeStage = typeof answers.lifeStage === "string" ? answers.lifeStage : "";
+  const concernKey = typeof answers.concern === "string" ? answers.concern : "";
+  const stage = lifeStage === "puppy" ? "Puppy" : lifeStage === "senior" ? "Senior" : "Adult";
+  const concernLabels: Record<string, string> = {
+    skin: "Skin & Allergies", pulling: "Leash Pulling", diet: "Diet & Weight",
+    breathing: "Breathing", wellness: "General Wellness",
+  };
+  const concern = escapeHtml(concernLabels[concernKey] || "General Wellness");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -141,10 +154,12 @@ serve(async (req) => {
   }
 
   try {
-    const { email, answers } = await req.json();
+    const body = await req.json();
+    const email = typeof body?.email === "string" ? normalizeEmail(body.email) : "";
+    const answers = body?.answers && typeof body.answers === "object" ? body.answers as Record<string, unknown> : {};
 
-    if (!email) {
-      return new Response(JSON.stringify({ error: "Email is required" }), {
+    if (!isValidEmail(email)) {
+      return new Response(JSON.stringify({ error: "A valid email is required" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       });
@@ -179,7 +194,7 @@ serve(async (req) => {
 
     if (!resendRes.ok) {
       console.error("Resend error:", resendData);
-      return new Response(JSON.stringify({ error: "Failed to send email", details: resendData }), {
+      return new Response(JSON.stringify({ error: "Failed to send email" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
       });
@@ -202,7 +217,7 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("Email send error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: "Email send failed" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });

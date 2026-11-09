@@ -1,8 +1,6 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { PawPrint, Clock, Shield, Sparkles, Utensils, Activity, Droplets, Heart, AlertTriangle } from 'lucide-react';
-import frenchieHero from '@/assets/frenchie-hero.png';
-
 type Props = {
   onStart: () => void;
 };
@@ -35,8 +33,10 @@ const LandingHero = ({ onStart }: Props) => (
       >
         <div className="absolute inset-0 rounded-full bg-secondary/20 blur-2xl" />
         <motion.img
-          src={frenchieHero}
+          src="/frenchie-hero.webp"
           alt="French Bulldog illustration"
+          width={384}
+          height={384}
           className="relative w-full h-full object-contain drop-shadow-xl"
           animate={{ y: [0, -8, 0] }}
           transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}

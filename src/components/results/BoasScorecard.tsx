@@ -35,9 +35,9 @@ const BoasScorecard = ({ onLevelChange }: Props) => {
   useEffect(() => { onLevelChange?.(result.level); }, [result.level, onLevelChange]);
 
   const levelLabel =
-    result.level === 'urgent' ? 'Urgent Action Required'
-    : result.level === 'moderate' ? 'Moderate Risk'
-    : 'Low Risk';
+    result.level === 'urgent' ? 'Get emergency care'
+    : result.level === 'moderate' ? 'Mention this to your vet'
+    : 'No extra signs selected';
 
   return (
     <motion.div
@@ -52,9 +52,9 @@ const BoasScorecard = ({ onLevelChange }: Props) => {
         </div>
         <div>
           <h3 className="font-black text-foreground font-display text-lg leading-tight">
-            BOAS Breathing Scorecard
+            Breathing check
           </h3>
-          <p className="text-xs text-muted-foreground">Interactive — map your dog's symptoms</p>
+          <p className="text-xs text-muted-foreground">Notes from home. Not a BOAS grade or a diagnosis.</p>
         </div>
       </div>
 
@@ -67,6 +67,7 @@ const BoasScorecard = ({ onLevelChange }: Props) => {
                 key={s.value}
                 type="button"
                 onClick={() => setSound(s.value)}
+                aria-pressed={sound === s.value}
                 className={`px-2 py-2 rounded-lg text-xs font-bold border-2 transition-all ${
                   sound === s.value
                     ? 'bg-primary text-primary-foreground border-primary'
@@ -103,7 +104,6 @@ const BoasScorecard = ({ onLevelChange }: Props) => {
         <div className={`rounded-xl border-2 p-3 ${levelStyles[result.level]}`}>
           <div className="flex items-center justify-between mb-1">
             <span className="font-black text-sm uppercase tracking-wide">{levelLabel}</span>
-            <span className="font-black text-xl">{result.score}</span>
           </div>
           {result.reasons.length > 0 && (
             <ul className="text-xs space-y-0.5 opacity-90">

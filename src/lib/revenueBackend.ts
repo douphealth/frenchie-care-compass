@@ -1,6 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
 import { QuizAnswers } from './quizData';
 import { PlanSection } from './planGenerator';
+import { Entitlement, acceptServerVerification } from './entitlement';
+import { PAYMENT_LINKS } from './stripeConfig';
+import { isValidEmail, normalizeEmail } from './quizValidation';
 
 const WP_ENDPOINT = 'https://frenchyfab.com/wp-json/ffab-care/v1';
 const BACKEND_TIMEOUT_MS = 9000;
@@ -15,7 +18,15 @@ export type LeadPayload = {
 export type CheckoutPayload = {
   email: string;
   addBump: boolean;
+  answers?: QuizAnswers;
 };
+
+export type CheckoutResult = {
+  url: string;
+  mode: 'verified-session' | 'payment-link';
+};
+
+type DataLayerWindow = Window & { dataLayer?: Array<Record<string, unknown>> };
 
 function withTimeout<T>(promise: Promise<T>, ms = BACKEND_TIMEOUT_MS): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -57,8 +68,9 @@ export function trackRevenueEvent(event: string, properties: Record<string, unkn
   localStorage.setItem('ffab_care_events', JSON.stringify(existing.slice(-100)));
 
   window.dispatchEvent(new CustomEvent('ffab-care-event', { detail: payload }));
-  (window as any).dataLayer = (window as any).dataLayer || [];
-  (window as any).dataLayer.push(payload);
+  const win = window as DataLayerWindow;
+  win.dataLayer = win.dataLayer || [];
+  win.dataLayer.push(payload);
 }
 
 async function postToWordPress(path: string, body: Record<string, unknown>) {
@@ -87,7 +99,9 @@ export async function generateAiPlan(answers: QuizAnswers): Promise<PlanSection[
     const { data, error } = await withTimeout(
       supabase.functions.invoke('generate-plan', { body: { answers } })
     );
-    if (error || !data?.sections) throw error || new Error('No AI plan sections returned');
+    if (error || !Array.isArray(data?.sections) || data.sections.length === 0) {
+      throw error || new Error('No AI plan sections returned');
+    }
     trackRevenueEvent('ai_plan_generated');
     return data.sections;
   } catch (error) {
@@ -97,6 +111,7 @@ export async function generateAiPlan(answers: QuizAnswers): Promise<PlanSection[
 }
 
 export async function submitLead(payload: LeadPayload) {
+  if (!isValidEmail(payload.email)) throw new Error('Enter a valid email address.');
   trackRevenueEvent('email_submitted', { email_domain: payload.email.split('@')[1] || '' });
 
   // Primary durable lead capture lives on FrenchyFab WordPress so this funnel is not blocked
@@ -122,20 +137,50 @@ export async function submitLead(payload: LeadPayload) {
   });
 }
 
-export async function createCheckout(payload: CheckoutPayload): Promise<string> {
+export function paymentLinkUrl(addBump: boolean, email: string): string {
+  const base = addBump ? PAYMENT_LINKS.vaultPlusChecklist : PAYMENT_LINKS.vault;
+  if (!isValidEmail(email)) return base;
+  return `${base}?prefilled_email=${encodeURIComponent(normalizeEmail(email))}`;
+}
+
+export async function createCheckout(payload: CheckoutPayload): Promise<CheckoutResult> {
   trackRevenueEvent('premium_cta_clicked', { add_bump: payload.addBump });
 
   try {
     const { data, error } = await withTimeout(
       supabase.functions.invoke('create-payment', { body: payload })
     );
-    if (error || !data?.url) throw error || new Error('Checkout URL missing');
+    if (error || !data?.url || typeof data.url !== 'string') throw error || new Error('Checkout URL missing');
     trackRevenueEvent('checkout_created', { backend: 'supabase', add_bump: payload.addBump });
-    return data.url;
+    return { url: data.url, mode: 'verified-session' };
   } catch (error) {
     trackRevenueEvent('checkout_backend_failed', { backend: 'supabase', error: String(error) });
-    await postToWordPress('/checkout-intent', payload as unknown as Record<string, unknown>);
-    trackRevenueEvent('checkout_intent_saved', { backend: 'wordpress', add_bump: payload.addBump });
-    throw error;
+    try {
+      await postToWordPress('/checkout-intent', payload as unknown as Record<string, unknown>);
+      trackRevenueEvent('checkout_intent_saved', { backend: 'wordpress', add_bump: payload.addBump });
+    } catch {
+      /* The payment link below is still the way to reach Stripe. */
+    }
+    return { url: paymentLinkUrl(payload.addBump, payload.email), mode: 'payment-link' };
+  }
+}
+
+export async function verifyCheckout(sessionId: string): Promise<Entitlement | null> {
+  if (!sessionId.startsWith('cs_')) return null;
+  const { data, error } = await withTimeout(
+    supabase.functions.invoke('verify-payment', { body: { sessionId } })
+  );
+  if (error) throw error;
+  return acceptServerVerification(sessionId, data);
+}
+
+/** Asks the server to email a recovery link. The response never includes entitlement. */
+export async function requestPurchaseRecovery(email: string): Promise<void> {
+  if (!isValidEmail(email)) throw new Error('Enter the email you used at checkout.');
+  const { data, error } = await withTimeout(
+    supabase.functions.invoke('restore-purchase', { body: { email: normalizeEmail(email) } })
+  );
+  if (error || data?.ok !== true) {
+    throw error || new Error(data?.error || 'Purchase recovery is unavailable.');
   }
 }

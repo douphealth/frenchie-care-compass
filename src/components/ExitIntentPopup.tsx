@@ -87,7 +87,7 @@ const ExitIntentPopup = ({ onStartQuiz }: Props) => {
               <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">✅ 100% Free</span>
                 <span className="flex items-center gap-1">⚡ 60 Seconds</span>
-                <span className="flex items-center gap-1">🐾 AI-Powered</span>
+                <span className="flex items-center gap-1">🐾 Breed-specific</span>
               </div>
 
               <Button

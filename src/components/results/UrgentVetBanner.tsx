@@ -1,15 +1,12 @@
 import { motion } from 'framer-motion';
-import { AlertTriangle, ExternalLink } from 'lucide-react';
-import { TELEHEALTH_URL } from '@/lib/affiliateCatalog';
+import { AlertTriangle } from 'lucide-react';
 
 const UrgentVetBanner = ({ reason }: { reason: string }) => (
-  <motion.a
-    href={TELEHEALTH_URL}
-    target="_blank"
-    rel="noopener noreferrer sponsored"
+  <motion.div
     initial={{ opacity: 0, scale: 0.97 }}
     animate={{ opacity: 1, scale: 1 }}
-    className="no-print mt-5 block rounded-2xl border-2 border-destructive bg-gradient-to-br from-destructive/10 via-warning/10 to-destructive/10 p-4 shadow-md hover:shadow-lg transition-shadow"
+    role="status"
+    className="no-print mt-5 rounded-2xl border-2 border-destructive bg-destructive/10 p-4"
   >
     <div className="flex items-start gap-3">
       <div className="w-10 h-10 shrink-0 rounded-xl bg-destructive flex items-center justify-center">
@@ -17,16 +14,15 @@ const UrgentVetBanner = ({ reason }: { reason: string }) => (
       </div>
       <div className="flex-1">
         <div className="text-[10px] font-black uppercase tracking-wider text-destructive mb-1">
-          Urgent action recommended
+          Contact a veterinarian
         </div>
         <p className="text-sm font-bold text-foreground mb-1">{reason}</p>
         <p className="text-xs text-foreground/80">
-          Talk to a licensed online vet now — typically connected in under 5 minutes.
+          This screen cannot examine your dog. If breathing is difficult, your dog collapses, or gum color changes, go to an emergency clinic. Do not wait on an app or give human medication.
         </p>
       </div>
-      <ExternalLink className="w-4 h-4 text-destructive shrink-0 mt-1" />
     </div>
-  </motion.a>
+  </motion.div>
 );
 
 export default UrgentVetBanner;

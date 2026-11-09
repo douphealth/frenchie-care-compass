@@ -1,44 +1,69 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Crown, FileText, CheckCircle2, Star, Download, Sparkles, Loader2, Clock, ShieldCheck, Zap } from 'lucide-react';
+import { Crown, FileText, CheckCircle2, Download, Loader2, ShieldCheck, Sparkles, Zap } from 'lucide-react';
 import { useState } from 'react';
-import { createCheckout } from '@/lib/revenueBackend';
+import { createCheckout, requestPurchaseRecovery } from '@/lib/revenueBackend';
+import { QuizAnswers } from '@/lib/quizData';
+import { isValidEmail, normalizeEmail } from '@/lib/quizValidation';
 import FeatureComparison from './FeatureComparison';
 import SocialProof from './SocialProof';
 
 type Props = {
   onSkip: () => void;
+  answers: QuizAnswers;
 };
 
 const vaultFeatures = [
-  'Personalized daily routine & weekly care schedule',
-  'Custom feeding charts with exact calorie & portion targets',
-  'Breed-specific exercise boundaries & warning flags',
-  'Skin, wrinkle & ear care cadence with product picks',
-  'Seasonal heat/cold adjustment calendar',
-  'Vet visit prep sheets by life stage',
-  'Emergency red-flag symptom checklist',
-  '"When to call the vet" decision guide',
-  'Printable grooming & feeding checklists',
-  'Beautifully designed 12+ page PDF',
-  'Lifetime updates as your Frenchie grows',
+  'Personalized daily routine and weekly care schedule',
+  'Feeding chart using the same calorie estimate as your free plan',
+  'Breed-specific activity precautions and warning signs',
+  'Skin, wrinkle, and ear care cadence',
+  'Seasonal heat and cold calendar',
+  'Vet visit prep sheet for this life stage',
+  'Emergency red-flag checklist (no medication doses)',
+  'When to call the vet',
+  'Printable grooming and feeding checklists',
+  'A longer PDF you can keep',
 ];
 
-const PremiumUpsell = ({ onSkip }: Props) => {
+const PremiumUpsell = ({ onSkip, answers }: Props) => {
   const [loading, setLoading] = useState(false);
   const [addBump, setAddBump] = useState(false);
+  const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [recoveryMessage, setRecoveryMessage] = useState('');
 
   const handleCheckout = async () => {
     setLoading(true);
     try {
       const email = localStorage.getItem('frenchie_email') || '';
-      const checkoutUrl = await createCheckout({ email, addBump });
-      window.location.href = checkoutUrl;
+      const checkout = await createCheckout({ email, addBump, answers });
+      if (checkout.mode === 'payment-link') {
+        trackNotice();
+      }
+      window.location.href = checkout.url;
     } catch (err) {
       console.error('Checkout error:', err);
-      alert('Checkout is being refreshed. We saved your upgrade request and will follow up with access details. You can keep using the free plan now.');
+      alert('Checkout could not be opened. No purchase has been confirmed.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const trackNotice = () => {
+    setRecoveryMessage('Opening Stripe. The vault unlocks only after a verified session returns to this site.');
+  };
+
+  const sendRecovery = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!isValidEmail(recoveryEmail)) {
+      setRecoveryMessage('Enter the email you used at checkout.');
+      return;
+    }
+    try {
+      await requestPurchaseRecovery(normalizeEmail(recoveryEmail));
+      setRecoveryMessage('If that email has a confirmed purchase, we sent an access link.');
+    } catch {
+      setRecoveryMessage('Recovery email is unavailable until the payment server is configured. Keep your Stripe receipt.');
     }
   };
 
@@ -64,7 +89,7 @@ const PremiumUpsell = ({ onSkip }: Props) => {
           Unlock the Frenchie Care Vault
         </h2>
         <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-          Get the complete breed-specific care operating system — avoid costly mistakes, build the right routine, and keep your Frenchie healthy.
+          The free plan stays on screen. The vault adds the routine, charts, checklists, and a longer PDF after Stripe confirms payment.
         </p>
       </motion.div>
 
@@ -76,9 +101,9 @@ const PremiumUpsell = ({ onSkip }: Props) => {
         className="flex items-center justify-center gap-3 mb-6"
       >
         {[
-          { icon: ShieldCheck, text: 'Vet-Informed' },
-          { icon: Zap, text: 'Instant Access' },
-          { icon: Sparkles, text: 'AI-Personalized' },
+          { icon: ShieldCheck, text: 'Educational' },
+          { icon: Zap, text: 'After payment' },
+          { icon: CheckCircle2, text: 'From your answers' },
         ].map(({ icon: Icon, text }) => (
           <div key={text} className="flex items-center gap-1 text-[11px] font-bold text-muted-foreground">
             <Icon className="w-3.5 h-3.5 text-secondary" />
@@ -103,12 +128,7 @@ const PremiumUpsell = ({ onSkip }: Props) => {
                 <div key={i} className="h-2 rounded-full bg-muted" style={{ width: `${w}%` }} />
               ))}
             </div>
-            <div className="flex gap-1 mt-2">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className="w-4 h-4 fill-premium-gold text-premium-gold" />
-              ))}
-            </div>
-            <span className="text-xs text-muted-foreground">12+ Pages · Personalized · Printable</span>
+            <span className="text-xs text-muted-foreground">Charts, checklists, and a printable PDF</span>
           </div>
         </div>
         <motion.div
@@ -183,27 +203,14 @@ const PremiumUpsell = ({ onSkip }: Props) => {
             </div>
             <div>
               <p className="text-sm font-black text-foreground">
-                ADD: Frenchie Emergency Red-Flag Checklist — <span className="text-red-600">+$4.99</span>
+                ADD: One-page emergency fridge card — <span className="text-red-600">+$4.99</span>
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Know exactly when something is wrong. Common Frenchie emergencies, symptoms to watch, and when to rush to the vet. Printable fridge card included.
+                The vault already includes the emergency checklist. This add-on is a separate large-type page meant for the fridge. It does not include medication doses.
               </p>
             </div>
           </div>
         </button>
-      </motion.div>
-
-      {/* Urgency banner */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4, delay: 0.35 }}
-        className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-destructive/10 border border-destructive/20 mb-6"
-      >
-        <Clock className="w-4 h-4 text-destructive" />
-        <p className="text-xs font-bold text-destructive">
-          Launch price — increases to $14.99 soon
-        </p>
       </motion.div>
 
       {/* Social Proof */}
@@ -239,14 +246,30 @@ const PremiumUpsell = ({ onSkip }: Props) => {
           <div className="flex items-center justify-center gap-2 mt-3 py-2 px-4 rounded-lg bg-emerald-50 border border-emerald-200/50">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
             <p className="text-xs font-bold text-emerald-700">
-              100% Money-Back Guarantee — No questions asked
+              Questions about a charge: hello@frenchyfab.com
             </p>
           </div>
           <p className="text-center text-xs text-muted-foreground mt-2">
-            One-time payment · Instant download · No subscription · Yours forever
+            One-time payment. The vault opens after Stripe confirms it. No subscription.
           </p>
+          {recoveryMessage && (
+            <p className="text-center text-xs text-muted-foreground mt-2">{recoveryMessage}</p>
+          )}
         </motion.div>
 
+        <form onSubmit={sendRecovery} className="flex gap-2">
+          <input
+            type="email"
+            aria-label="Email used at checkout"
+            value={recoveryEmail}
+            onChange={(event) => setRecoveryEmail(event.target.value)}
+            placeholder="Already paid? Checkout email"
+            className="flex-1 h-11 rounded-xl border border-border bg-background px-3 text-sm"
+          />
+          <button type="submit" className="text-sm font-bold text-primary px-2">
+            Resend link
+          </button>
+        </form>
         <button
           onClick={onSkip}
           className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors py-2"

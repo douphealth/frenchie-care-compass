@@ -1,5 +1,6 @@
 import { QuizAnswers } from './quizData';
 import { PlanSection } from './planGenerator';
+import { Entitlement } from './entitlement';
 
 const KEY = 'frenchie_profile_v1';
 
@@ -11,6 +12,8 @@ export type StoredProfile = {
   screen?: string;
   leadCaptured?: boolean;
   completedAt?: string;
+  /** Written only after the server confirms a paid Stripe session. */
+  entitlement?: Entitlement;
 };
 
 export function loadProfile(): StoredProfile {

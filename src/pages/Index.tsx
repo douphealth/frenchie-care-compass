@@ -11,6 +11,7 @@ import { quizSteps, QuizAnswers } from '@/lib/quizData';
 import { generatePlan, PlanSection } from '@/lib/planGenerator';
 import { generateAiPlan, submitLead, trackRevenueEvent } from '@/lib/revenueBackend';
 import { loadProfile, saveProfile, clearProfile } from '@/lib/profileStore';
+import { isValidEmail, normalizeEmail, parseQuizAnswers } from '@/lib/quizValidation';
 import { toast } from '@/hooks/use-toast';
 
 type Screen = 'landing' | 'quiz' | 'loading' | 'emailGate' | 'results' | 'upsell';
@@ -33,7 +34,14 @@ const Index = () => {
     if (stored.answers) setAnswers(stored.answers);
     if (stored.email) setEmail(stored.email);
     if (stored.plan) setPlan(stored.plan);
-    if (stored.plan && stored.answers && stored.email) {
+    const cancelled = new URLSearchParams(window.location.search).get('checkout') === 'cancelled';
+    if (cancelled) {
+      setScreen('upsell');
+      toast({
+        title: 'Checkout cancelled',
+        description: 'No payment was taken. The free plan is still here.',
+      });
+    } else if (stored.plan && stored.answers && stored.email) {
       setScreen('results');
     } else if (stored.screen === 'quiz' && typeof stored.step === 'number') {
       setScreen('quiz');
@@ -61,6 +69,10 @@ const Index = () => {
     if (step < quizSteps.length - 1) {
       setStep(s => s + 1);
     } else {
+      if (!parseQuizAnswers(answers)) {
+        toast({ title: 'Check your answers', description: 'A quiz answer was missing or not recognized.', variant: 'destructive' });
+        return;
+      }
       setScreen('loading');
       const aiPlan = await generateAiPlan(answers);
       const finalPlan = aiPlan || generatePlan(answers);
@@ -77,8 +89,11 @@ const Index = () => {
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail) return;
+    if (!isValidEmail(email)) {
+      toast({ title: 'Enter a valid email', description: 'We need a real address to save the plan.', variant: 'destructive' });
+      return;
+    }
+    const normalizedEmail = normalizeEmail(email);
 
     localStorage.setItem('frenchie_email', normalizedEmail);
     saveProfile({ email: normalizedEmail, leadCaptured: true });
@@ -91,8 +106,8 @@ const Index = () => {
       });
     } catch {
       toast({
-        title: 'Plan unlocked',
-        description: 'Your plan is saved in this browser. We will retry lead sync when the backend is available.',
+        title: 'Saved in this browser',
+        description: 'The care plan is on this device. Lead sync will retry when the server accepts it.',
         variant: 'destructive',
       });
     }
@@ -151,7 +166,7 @@ const Index = () => {
           )}
 
           {screen === 'upsell' && (
-            <PremiumUpsell onSkip={() => setScreen('results')} />
+            <PremiumUpsell answers={answers} onSkip={() => setScreen('results')} />
           )}
         </motion.div>
       </AnimatePresence>
