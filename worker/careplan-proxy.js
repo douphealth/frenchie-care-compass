@@ -430,7 +430,8 @@ function rewriteLegacy(body) {
 async function serveStatic(request, url) {
   const method = request.method === 'HEAD' ? 'GET' : request.method;
   let res = await fetch(new Request(request, { method, redirect: 'follow' }));
-  if (url.pathname === '/og-image.png' && res.status === 404) {
+  // Hosts that answer unknown paths with the SPA shell return HTML here, not a 404.
+  if (url.pathname === '/og-image.png' && !(res.ok && (res.headers.get('content-type') || '').startsWith('image/'))) {
     res = await fetch(LEGACY_PREVIEW_IMAGE);
   }
   // SPA routes such as /payment-success: serve the app shell instead of the host's 404.
