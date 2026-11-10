@@ -37,23 +37,33 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
   const stored = useMemo(() => loadProfile(), []);
   const hasLead = !!stored.leadCaptured || !!stored.email;
   const premium = canAccessPremium(entitlement);
+  // A purchase is on record but has not been re-confirmed with Stripe yet (checking, or the check failed).
+  const [recheck, setRecheck] = useState<'idle' | 'checking' | 'failed'>(stored.entitlement ? 'checking' : 'idle');
+  const purchaseOnRecord = Boolean(stored.entitlement) && !premium;
 
   useEffect(() => {
     const sessionId = stored.entitlement?.sessionId;
     if (!sessionId) return;
     let cancelled = false;
     verifyCheckout(sessionId)
-      .then((next) => {
+      .then((verified) => {
         if (cancelled) return;
+        const next = verified?.entitlement;
         if (next && canAccessPremium(next)) {
           setEntitlement(next);
           saveProfile({ entitlement: next });
+          setRecheck('idle');
         } else {
+          // Stripe answered: not paid, or refunded.
           saveProfile({ entitlement: undefined });
+          setRecheck('idle');
         }
       })
       .catch(() => {
-        if (!cancelled) setEntitlement(null);
+        if (!cancelled) {
+          setEntitlement(null);
+          setRecheck('failed');
+        }
       });
     return () => { cancelled = true; };
   }, [stored.entitlement?.sessionId]);
@@ -193,7 +203,20 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
           </div>
         </div>
 
-        {/* Premium Upgrade CTA */}
+        {/* Premium Upgrade CTA: never shown to someone who already bought */}
+        {purchaseOnRecord && recheck !== 'idle' && (
+          <div className="no-print mt-5 rounded-2xl border border-border bg-card p-5 text-center">
+            <p className="text-sm font-bold text-foreground">
+              {recheck === 'checking' ? 'Re-checking your Care Vault purchase with Stripe...' : 'We could not re-confirm your purchase just now.'}
+            </p>
+            {recheck === 'failed' && (
+              <p className="text-xs text-muted-foreground mt-1">
+                You do not need to pay again. Reload in a minute, or open the access link we emailed you.
+              </p>
+            )}
+          </div>
+        )}
+        {!premium && !(purchaseOnRecord && recheck !== 'idle') && (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -209,7 +232,7 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
               Unlock the Complete Care Operating System
             </h3>
             <p className="text-xs text-muted-foreground mb-4">
-              Everything you need to avoid costly care mistakes — yours forever.
+              A 4-week plan for your main concern, plus the routine, checklists and a longer printable PDF. Yours to keep.
             </p>
             <Button
               onClick={onUpgrade}
@@ -222,6 +245,7 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
             </p>
           </div>
         </motion.div>
+        )}
 
         {/* Actions */}
         <div className="no-print mt-6 flex items-center justify-center gap-3">

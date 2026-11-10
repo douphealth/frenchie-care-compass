@@ -1,5 +1,5 @@
 import { QuizAnswers } from './quizData';
-import { buildMER } from './clinical';
+import { buildMER, formatCups } from './clinical';
 
 export type PlanSection = {
   icon: string;
@@ -38,7 +38,8 @@ export function generatePlan(answers: QuizAnswers): PlanSection[] {
   const wt = weightLbs(weight);
   const mer = buildMER(answers);
   const meals = mealsPerDay(lifeStage);
-  const cupsPerMeal = (Math.round((mer.cupsPerDay / meals) * 4) / 4).toFixed(2).replace(/0$/, '').replace(/\.$/, '');
+  const cupsPerDay = mer.kcalPerDay / 350;
+  const cupsPerMeal = formatCups(cupsPerDay / meals);
   const walk = walkMinutes(lifeStage, activityLevel);
 
   /* ── 1. FEEDING ── */
@@ -46,11 +47,11 @@ export function generatePlan(answers: QuizAnswers): PlanSection[] {
     icon: '🍽️',
     title: 'Personalized Feeding Plan',
     items: [],
-    articleLink: { label: 'Healthy Treats Guide', url: 'https://frenchyfab.com/french-bulldog-healthy-treats' },
+    articleLink: { label: 'Healthy Treats Guide', url: 'https://frenchyfab.com/french-bulldog-healthy-treats-guide/' },
   };
 
   feeding.items.push(`Estimated energy need: about ${mer.kcalPerDay} kcal/day for a typical ${wt.label} Frenchie at body score ${bodyCondition}/9 (${mer.kLabel}). Confirm against your food label and your veterinarian.`);
-  feeding.items.push(`Split into ${meals} meals — about ${mer.cupsPerDay} cups/day total if the food is 350 kcal per cup (about ${cupsPerMeal} cups per meal).`);
+  feeding.items.push(`Split into ${meals} meals — about ${formatCups(cupsPerDay)} cups a day if the food has 350 kcal per cup, so about ${cupsPerMeal} cup per meal. Use the kcal/cup on your own bag to adjust.`);
   feeding.items.push(`Look for food with ${proteinPct(lifeStage)} protein, named meat as the first ingredient.`);
 
   if (lifeStage === 'puppy') {
@@ -93,7 +94,7 @@ export function generatePlan(answers: QuizAnswers): PlanSection[] {
     icon: '🧴',
     title: 'Grooming Routine',
     items: [],
-    articleLink: { label: 'Complete Grooming Blueprint', url: 'https://frenchyfab.com/french-bulldog-grooming-blueprint/' },
+    articleLink: { label: 'Complete Grooming Blueprint', url: 'https://frenchyfab.com/grooming-your-french-bulldog-complete-guide/' },
   };
 
   grooming.items.push('Clean facial wrinkles DAILY with a damp cloth — dry thoroughly to prevent yeast.');
@@ -196,7 +197,7 @@ export function generatePlan(answers: QuizAnswers): PlanSection[] {
     health.items.push('Monitor for cognitive dysfunction: disorientation, night waking, potty regression.');
     health.items.push('Watch for lumps/bumps — report any new growths to your vet immediately.');
   } else {
-    health.items.push('Keep vaccinations current. Annual titer tests can replace some boosters.');
+    health.items.push('Keep vaccinations current. Rabies boosters are required by law; ask your vet whether titer tests make sense for the others.');
     health.items.push('Annual dental exam minimum — most Frenchies need professional cleanings.');
   }
 
@@ -231,7 +232,7 @@ export function generatePlan(answers: QuizAnswers): PlanSection[] {
     icon: '💊',
     title: 'Supplement Recommendations',
     items: [],
-    articleLink: { label: 'Supplement Guide: Puppy to Senior', url: 'https://frenchyfab.com/essential-nutritional-supplements-french-bulldogs/' },
+    articleLink: { label: 'Supplement Guide: Puppy to Senior', url: 'https://frenchyfab.com/supplements-for-french-bulldogs-what-you-need-to-know/' },
   };
 
   supplements.items.push('Probiotics DAILY — Frenchies have sensitive stomachs; look for multi-strain formulas.');
@@ -295,7 +296,7 @@ export function generatePlan(answers: QuizAnswers): PlanSection[] {
     if (environment.includes('hot')) {
       env.items.push('Keep indoor temperature below 75°F with AC or fans.');
       env.items.push('Provide a cooling mat or elevated mesh bed.');
-      env.items.push('Freeze a Kong with peanut butter for a cooling treat.');
+      env.items.push('Freeze a Kong with plain, xylitol-free peanut butter for a cooling treat (xylitol is toxic to dogs, so check the label).');
     }
 
     if (environment.includes('cold')) {

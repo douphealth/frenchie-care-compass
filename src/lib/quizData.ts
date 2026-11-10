@@ -38,7 +38,7 @@ export const quizSteps = [
     subtitle: 'Helps determine portion sizes and exercise intensity.',
     type: 'single' as const,
     options: [
-      { value: 'under20', label: 'Under 20 lbs', description: 'Lighter build', hint: 'Adjusts feeding portions & supplement dosages', icon: 'feather' },
+      { value: 'under20', label: 'Under 20 lbs', description: 'Lighter build', hint: 'Adjusts calorie and portion estimates', icon: 'feather' },
       { value: '20-28', label: '20–28 lbs', description: 'Average range', hint: 'Standard calorie & portion calculations', icon: 'scale' },
       { value: 'over28', label: 'Over 28 lbs', description: 'Heavier build', hint: 'May flag weight management recommendations', icon: 'trending-up' },
     ],
