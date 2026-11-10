@@ -1,6 +1,7 @@
 export type PdfTier = 'free' | 'premium';
 
 const VAULT_PAGES = [
+  'focus-program',
   'feeding-chart',
   'grooming-checklist',
   'seasonal-calendar',

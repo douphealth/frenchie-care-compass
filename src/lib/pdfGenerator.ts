@@ -3,6 +3,7 @@ import { PlanSection } from './planGenerator';
 import { QuizAnswers } from './quizData';
 import { buildMER } from './clinical';
 import { includedPremiumPages, PdfTier } from './pdfOutline';
+import { buildFocusProgram } from './focusProgram';
 import frenchieHeroUrl from '@/assets/frenchie-hero.png';
 import frenchieFaceUrl from '@/assets/frenchie-face.png';
 import pawIconUrl from '@/assets/paw-icon.png';
@@ -629,6 +630,80 @@ export async function generatePDF(
 
     addFooter();
   });
+
+  /* ═══════════════════════════════════════════════
+   * 4-WEEK FOCUS PROGRAM (main concern) — vault centrepiece
+   * ═══════════════════════════════════════════════ */
+  if (premiumPages.has('focus-program')) {
+    const program = buildFocusProgram(answers);
+    doc.addPage();
+    newPageBg();
+    y = 20;
+    drawPageTitle(program.title.replace(/^4-week/, '4-Week'));
+
+    const para = (label: string, text: string) => {
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      const lines = doc.splitTextToSize(`${label} ${text}`, contentW);
+      ensureSpace(lines.length * 4.6 + 3);
+      doc.setTextColor(...C.text);
+      doc.text(lines, mx, y);
+      y += lines.length * 4.6 + 3;
+    };
+    para('Goal:', program.goal);
+    para('Track:', program.track);
+    y += 2;
+
+    const weekColors: ReadonlyArray<readonly [number, number, number]> = [C.emerald, C.sky, C.violet, C.terracotta];
+    program.weeks.forEach((week, i) => {
+      ensureSpace(16);
+      doc.setFillColor(...weekColors[i % weekColors.length]);
+      doc.roundedRect(mx, y, contentW, 8, 2, 2, 'F');
+      doc.setFontSize(9);
+      doc.setTextColor(...C.white);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`WEEK ${week.week}  -  ${week.title.toUpperCase()}`, mx + 4, y + 5.5);
+      y += 11;
+      week.actions.forEach((action) => {
+        doc.setFontSize(8.5);
+        doc.setFont('helvetica', 'normal');
+        const lines = doc.splitTextToSize(stripEmoji(action), contentW - 14);
+        const h = lines.length * 4.2 + 3;
+        ensureSpace(h + 1);
+        doc.setDrawColor(...C.border);
+        doc.setLineWidth(0.25);
+        doc.rect(mx + 2, y - 0.5, 4, 4, 'S');
+        doc.setFontSize(8.5);
+        doc.setTextColor(...C.text);
+        doc.setFont('helvetica', 'normal');
+        doc.text(lines, mx + 10, y + 2.6);
+        y += h;
+      });
+      y += 3;
+    });
+
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'normal');
+    const vetLines = program.vetNow.map((s) => doc.splitTextToSize(`-  ${s}`, contentW - 10) as string[]);
+    const boxH = 10 + vetLines.reduce((n, l) => n + l.length * 4.2, 0) + 3;
+    ensureSpace(boxH + 2);
+    doc.setFillColor(...C.roseBg);
+    doc.setDrawColor(...C.rose);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(mx, y, contentW, boxH, 3, 3, 'FD');
+    doc.setFontSize(9);
+    doc.setTextColor(...C.rose);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SEE A VET NOW IF YOU NOTICE', mx + 5, y + 6.5);
+    let vy = y + 12;
+    doc.setFontSize(8.5);
+    doc.setTextColor(...C.text);
+    doc.setFont('helvetica', 'normal');
+    vetLines.forEach((lines) => { doc.text(lines, mx + 5, vy); vy += lines.length * 4.2; });
+    y += boxH + 4;
+
+    addFooter();
+  }
 
   /* ═══════════════════════════════════════════════
    * CUSTOM FEEDING CHART & PORTIONS PAGE
@@ -1297,10 +1372,10 @@ export async function generatePDF(
   drawPageTitle('Helpful Resources');
 
   const resources = [
-    { title: 'Healthy Treats Guide', desc: 'Discover safe, nutritious treats your Frenchie will love -- including portion guidelines and homemade recipes.', url: 'frenchyfab.com/french-bulldog-healthy-treats' },
-    { title: 'Complete Grooming Blueprint', desc: 'Step-by-step grooming routines tailored for French Bulldogs, from wrinkle care to nail trimming.', url: 'frenchyfab.com/french-bulldog-grooming-blueprint/' },
-    { title: 'Essential Supplements Guide', desc: 'Evidence-based supplement recommendations from puppy to senior -- including dosages and top brands.', url: 'frenchyfab.com/essential-nutritional-supplements-french-bulldogs/' },
-    { title: 'Best Harness for Pulling', desc: "Expert-reviewed harness picks that prevent pulling and protect your Frenchie's delicate airway.", url: 'frenchyfab.com/best-harness-for-french-bulldog-that-pulls/' },
+    { title: 'Healthy Treats Guide', desc: 'Discover safe, nutritious treats your Frenchie will love -- including portion guidelines and homemade recipes.', url: 'frenchyfab.com/french-bulldog-healthy-treats-guide/' },
+    { title: 'Complete Grooming Blueprint', desc: 'Step-by-step grooming routines tailored for French Bulldogs, from wrinkle care to nail trimming.', url: 'frenchyfab.com/grooming-your-french-bulldog-complete-guide/' },
+    { title: 'Essential Supplements Guide', desc: 'Supplement options from puppy to senior, and the questions to ask your vet before buying.', url: 'frenchyfab.com/supplements-for-french-bulldogs-what-you-need-to-know/' },
+    { title: 'Best Harness for Pulling', desc: "Harness picks that keep pressure off your Frenchie's throat on walks.", url: 'frenchyfab.com/best-harness-for-french-bulldog-that-pulls/' },
   ];
 
   resources.forEach((res) => {
@@ -1404,7 +1479,7 @@ export async function generatePDF(
   doc.setFontSize(8);
   doc.setTextColor(...C.brown);
   doc.setFont('helvetica', 'bold');
-  doc.text('Lifetime Updates Included -- Re-take the quiz anytime for fresh recommendations', pw / 2, ph / 2 + 42, { align: 'center' });
+  doc.text('Retake the quiz anytime as your Frenchie grows for updated recommendations', pw / 2, ph / 2 + 42, { align: 'center' });
 
   doc.setDrawColor(...C.border);
   doc.setLineWidth(0.3);

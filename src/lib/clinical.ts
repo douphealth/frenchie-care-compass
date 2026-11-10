@@ -61,6 +61,16 @@ export function calcMER(weightKg: number, k: number): number {
   return Math.round(k * Math.pow(weightKg, 0.75));
 }
 
+const EIGHTHS = ['', '⅛', '¼', '⅜', '½', '⅝', '¾', '⅞'];
+
+/** 1.625 -> "1⅝", 0.875 -> "⅞". Rounds to the nearest eighth of a cup, the finest a measuring cup shows. */
+export function formatCups(cups: number): string {
+  const eighths = Math.max(1, Math.round(cups * 8));
+  const whole = Math.floor(eighths / 8);
+  const frac = EIGHTHS[eighths % 8];
+  return whole === 0 ? frac : `${whole}${frac}`;
+}
+
 export function kcalToCups(kcal: number, kcalPerCup = 350): number {
   const raw = kcal / kcalPerCup;
   return Math.round(raw * 4) / 4; // nearest 0.25 cup

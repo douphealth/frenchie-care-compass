@@ -1,11 +1,15 @@
-import { supabase } from '@/integrations/supabase/client';
 import { QuizAnswers } from './quizData';
 import { PlanSection } from './planGenerator';
 import { Entitlement, acceptServerVerification } from './entitlement';
 import { PAYMENT_LINKS } from './stripeConfig';
-import { isValidEmail, normalizeEmail } from './quizValidation';
+import { isValidEmail, normalizeEmail, parseQuizAnswers } from './quizValidation';
 
-const WP_ENDPOINT = 'https://frenchyfab.com/wp-json/ffab-care/v1';
+/**
+ * The app's backend is the Cloudflare Worker in /worker, on the same origin as the app.
+ * For local dev against production, set VITE_API_BASE=https://care-plan.frenchyfab.com.
+ */
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, '') ?? '';
+const LEAD_ENDPOINT = `${API_BASE}/api/ffab-care/v1`;
 const BACKEND_TIMEOUT_MS = 9000;
 
 export type LeadPayload = {
@@ -73,8 +77,8 @@ export function trackRevenueEvent(event: string, properties: Record<string, unkn
   win.dataLayer.push(payload);
 }
 
-async function postToWordPress(path: string, body: Record<string, unknown>) {
-  const response = await withTimeout(fetch(`${WP_ENDPOINT}${path}`, {
+async function postLead(path: string, body: Record<string, unknown>) {
+  const response = await withTimeout(fetch(`${LEAD_ENDPOINT}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -88,53 +92,60 @@ async function postToWordPress(path: string, body: Record<string, unknown>) {
 
   const json = await response.json().catch(() => ({}));
   if (!response.ok || json?.success === false) {
-    throw new Error(json?.message || `WordPress endpoint failed with ${response.status}`);
+    throw new Error(json?.message || `Lead endpoint failed with ${response.status}`);
   }
   return json;
 }
 
-export async function generateAiPlan(answers: QuizAnswers): Promise<PlanSection[] | null> {
-  trackRevenueEvent('quiz_completed', { answers });
-  try {
-    const { data, error } = await withTimeout(
-      supabase.functions.invoke('generate-plan', { body: { answers } })
-    );
-    if (error || !Array.isArray(data?.sections) || data.sections.length === 0) {
-      throw error || new Error('No AI plan sections returned');
-    }
-    trackRevenueEvent('ai_plan_generated');
-    return data.sections;
-  } catch (error) {
-    trackRevenueEvent('ai_plan_fallback_used', { error: String(error) });
-    return null;
+/** Calls a Worker route under /functions/v1 and throws with the server's message on failure. */
+async function callFunction<T>(name: string, body: Record<string, unknown>): Promise<T> {
+  const response = await withTimeout(fetch(`${API_BASE}/functions/v1/${name}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }));
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data) {
+    throw new Error((data && typeof data.error === 'string' && data.error) || `${name} failed with ${response.status}`);
   }
+  return data as T;
 }
+
+const PENDING_LEAD_KEY = 'ffab_pending_lead';
 
 export async function submitLead(payload: LeadPayload) {
   if (!isValidEmail(payload.email)) throw new Error('Enter a valid email address.');
   trackRevenueEvent('email_submitted', { email_domain: payload.email.split('@')[1] || '' });
+  const body = { email: normalizeEmail(payload.email), answers: payload.answers, source: payload.source };
 
-  // Primary durable lead capture lives on FrenchyFab WordPress so this funnel is not blocked
-  // if the old Supabase project is paused/deleted.
   try {
-    const data = await postToWordPress('/lead', payload as unknown as Record<string, unknown>);
-    localStorage.setItem('ffab_care_lead_id', String(data.id || data.lead_id || 'wp'));
-    trackRevenueEvent('lead_saved', { backend: 'wordpress', lead_id: data.id || data.lead_id });
-  } catch (wpError) {
-    // Never lose the lead locally; mark for later recovery and continue with the free result.
-    localStorage.setItem('ffab_pending_lead', JSON.stringify({ ...payload, saved_at: new Date().toISOString() }));
-    trackRevenueEvent('lead_save_failed', { backend: 'wordpress', error: String(wpError) });
-    throw wpError;
+    const data = await postLead('/lead', body);
+    localStorage.setItem('ffab_care_lead_id', String(data.id || data.lead_id || 'saved'));
+    localStorage.removeItem(PENDING_LEAD_KEY);
+    trackRevenueEvent('lead_saved', { backend: 'worker', lead_id: data.id || data.lead_id });
+  } catch (error) {
+    // Keep the lead on this device and retry on the next visit (see retryPendingLead).
+    localStorage.setItem(PENDING_LEAD_KEY, JSON.stringify({ ...body, saved_at: new Date().toISOString() }));
+    trackRevenueEvent('lead_save_failed', { backend: 'worker', error: String(error) });
+    throw error;
   }
+}
 
-  // Secondary best-effort email automation. Kept as progressive enhancement only.
-  supabase.functions.invoke('send-welcome-email', {
-    body: { email: payload.email, answers: payload.answers },
-  }).then(() => {
-    trackRevenueEvent('welcome_email_requested', { backend: 'supabase' });
-  }).catch((error) => {
-    trackRevenueEvent('welcome_email_fallback_used', { error: String(error) });
-  });
+/** Re-sends a lead that failed to save on an earlier visit. Silent on failure. */
+export async function retryPendingLead(): Promise<void> {
+  let pending: { email?: string; answers?: QuizAnswers; source?: string } | null = null;
+  try {
+    pending = JSON.parse(localStorage.getItem(PENDING_LEAD_KEY) || 'null');
+  } catch {
+    localStorage.removeItem(PENDING_LEAD_KEY);
+    return;
+  }
+  if (!pending?.email || !pending.answers) return;
+  try {
+    await submitLead({ email: pending.email, answers: pending.answers, source: pending.source || 'frenchie-care-plan-app-retry' });
+  } catch {
+    /* stays pending */
+  }
 }
 
 export function paymentLinkUrl(addBump: boolean, email: string): string {
@@ -147,40 +158,37 @@ export async function createCheckout(payload: CheckoutPayload): Promise<Checkout
   trackRevenueEvent('premium_cta_clicked', { add_bump: payload.addBump });
 
   try {
-    const { data, error } = await withTimeout(
-      supabase.functions.invoke('create-payment', { body: payload })
-    );
-    if (error || !data?.url || typeof data.url !== 'string') throw error || new Error('Checkout URL missing');
-    trackRevenueEvent('checkout_created', { backend: 'supabase', add_bump: payload.addBump });
+    const data = await callFunction<{ url?: unknown }>('create-payment', payload as unknown as Record<string, unknown>);
+    if (typeof data.url !== 'string' || !data.url.startsWith('https://checkout.stripe.com/')) {
+      throw new Error('Checkout URL missing');
+    }
+    trackRevenueEvent('checkout_created', { backend: 'worker', add_bump: payload.addBump });
     return { url: data.url, mode: 'verified-session' };
   } catch (error) {
-    trackRevenueEvent('checkout_backend_failed', { backend: 'supabase', error: String(error) });
-    try {
-      await postToWordPress('/checkout-intent', payload as unknown as Record<string, unknown>);
-      trackRevenueEvent('checkout_intent_saved', { backend: 'wordpress', add_bump: payload.addBump });
-    } catch {
-      /* The payment link below is still the way to reach Stripe. */
-    }
+    trackRevenueEvent('checkout_backend_failed', { backend: 'worker', error: String(error) });
     return { url: paymentLinkUrl(payload.addBump, payload.email), mode: 'payment-link' };
   }
 }
 
-export async function verifyCheckout(sessionId: string): Promise<Entitlement | null> {
+export type VerifiedCheckout = {
+  entitlement: Entitlement;
+  /** Quiz answers stored on the Stripe session, so the vault can be rebuilt on another device. */
+  answers: QuizAnswers | null;
+};
+
+/** `fulfil` asks the server to email the access link (first successful check only). */
+export async function verifyCheckout(sessionId: string, opts: { fulfil?: boolean } = {}): Promise<VerifiedCheckout | null> {
   if (!sessionId.startsWith('cs_')) return null;
-  const { data, error } = await withTimeout(
-    supabase.functions.invoke('verify-payment', { body: { sessionId } })
-  );
-  if (error) throw error;
-  return acceptServerVerification(sessionId, data);
+  const data = await callFunction<Record<string, unknown>>('verify-payment', { sessionId, fulfil: opts.fulfil === true });
+  const entitlement = acceptServerVerification(sessionId, data);
+  if (!entitlement) return null;
+  trackRevenueEvent('payment_verified', { include_emergency_card: entitlement.includeEmergencyCard });
+  return { entitlement, answers: parseQuizAnswers(data.answers) };
 }
 
 /** Asks the server to email a recovery link. The response never includes entitlement. */
 export async function requestPurchaseRecovery(email: string): Promise<void> {
   if (!isValidEmail(email)) throw new Error('Enter the email you used at checkout.');
-  const { data, error } = await withTimeout(
-    supabase.functions.invoke('restore-purchase', { body: { email: normalizeEmail(email) } })
-  );
-  if (error || data?.ok !== true) {
-    throw error || new Error(data?.error || 'Purchase recovery is unavailable.');
-  }
+  const data = await callFunction<{ ok?: unknown }>('restore-purchase', { email: normalizeEmail(email) });
+  if (data.ok !== true) throw new Error('Purchase recovery is unavailable.');
 }

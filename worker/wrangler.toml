@@ -1,0 +1,17 @@
+name = "frenchyfab-careplan-selfhosted-proxy"
+main = "careplan-proxy.js"
+compatibility_date = "2026-09-01"
+
+routes = [
+  { pattern = "care-plan.frenchyfab.com/*", zone_name = "frenchyfab.com" },
+]
+
+# Secrets (set once, never commit values):
+#   npx wrangler secret put STRIPE_SECRET_KEY   # restricted key; Checkout Sessions read is the minimum
+#   npx wrangler secret put BREVO_API_KEY
+[vars]
+BREVO_LIST_ID = "8"
+MAIL_FROM = "info@frenchyfab.com"
+# The current Stripe key cannot create Checkout Sessions, so checkout uses the Payment Links.
+# Remove this once the key has Checkout Sessions: write.
+CHECKOUT_VIA_LINKS = "1"

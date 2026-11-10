@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion';
-import { Lock, Calendar, Utensils, AlertTriangle, Stethoscope, Thermometer, CheckCircle2 } from 'lucide-react';
+import { Lock, Calendar, Utensils, AlertTriangle, Stethoscope, Thermometer, CheckCircle2, Target } from 'lucide-react';
 import { QuizAnswers } from '@/lib/quizData';
 import { buildPremiumModules } from '@/lib/premiumContent';
+import { buildFocusProgram } from '@/lib/focusProgram';
 
 type Props = {
   onUpgrade: () => void;
@@ -19,6 +20,7 @@ const lockedItems = [
 
 const LockedModules = ({ onUpgrade, unlocked, answers }: Props) => {
   const modules = unlocked ? buildPremiumModules(answers) : [];
+  const program = buildFocusProgram(answers);
 
   return (
     <motion.div
@@ -35,6 +37,32 @@ const LockedModules = ({ onUpgrade, unlocked, answers }: Props) => {
               Premium modules — unlocked
             </span>
           </div>
+          <section className="rounded-xl border border-amber-300 bg-amber-50/60 p-4">
+            <p className="text-[10px] font-black uppercase tracking-wider text-amber-700 mb-1">Your main focus</p>
+            <h3 className="text-base font-black text-foreground">{program.title}</h3>
+            <p className="text-xs text-foreground/80 mt-1 leading-relaxed">{program.goal}</p>
+            <p className="text-xs text-foreground/80 mt-2 leading-relaxed"><strong>Track:</strong> {program.track}</p>
+            <ol className="mt-3 space-y-3">
+              {program.weeks.map((week) => (
+                <li key={week.week} className="rounded-lg bg-white/70 border border-amber-200/70 p-3">
+                  <p className="text-xs font-black text-foreground">Week {week.week}: {week.title}</p>
+                  <ul className="mt-1.5 space-y-1 list-disc pl-4">
+                    {week.actions.map((action) => (
+                      <li key={action} className="text-xs text-foreground/80 leading-relaxed">{action}</li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ol>
+            <div className="mt-3 rounded-lg border border-red-200 bg-red-50/70 p-3">
+              <p className="text-xs font-black text-red-700">See a vet now if you notice</p>
+              <ul className="mt-1 space-y-1 list-disc pl-4">
+                {program.vetNow.map((sign) => (
+                  <li key={sign} className="text-xs text-red-900/80">{sign}</li>
+                ))}
+              </ul>
+            </div>
+          </section>
           {modules.map((module) => (
             <section
               key={module.id}
@@ -59,6 +87,19 @@ const LockedModules = ({ onUpgrade, unlocked, answers }: Props) => {
               Premium modules — locked
             </span>
           </div>
+          <button
+            type="button"
+            onClick={onUpgrade}
+            className="w-full mb-2 flex items-center gap-3 p-3 rounded-xl border-2 border-dashed border-amber-300 bg-amber-50/50 hover:bg-amber-50 transition-all text-left"
+          >
+            <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+              <Target className="w-4 h-4 text-amber-700" />
+            </div>
+            <span className="text-xs leading-snug">
+              <span className="block font-black text-foreground/80">{program.title}</span>
+              <span className="block text-foreground/60">Week-by-week steps for your main concern: {program.weeks.map((w) => w.title.toLowerCase()).join(' → ')}</span>
+            </span>
+          </button>
           <div className="grid grid-cols-2 gap-2">
             {lockedItems.map(({ icon: Icon, label }) => (
               <button

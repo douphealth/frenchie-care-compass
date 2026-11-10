@@ -7,6 +7,7 @@ import { QuizAnswers } from '@/lib/quizData';
 import { isValidEmail, normalizeEmail } from '@/lib/quizValidation';
 import FeatureComparison from './FeatureComparison';
 import SocialProof from './SocialProof';
+import { buildFocusProgram } from '@/lib/focusProgram';
 
 type Props = {
   onSkip: () => void;
@@ -14,6 +15,7 @@ type Props = {
 };
 
 const vaultFeatures = [
+  'A 4-week, week-by-week program for your main concern, with what to track and when to see a vet',
   'Personalized daily routine and weekly care schedule',
   'Feeding chart using the same calorie estimate as your free plan',
   'Breed-specific activity precautions and warning signs',
@@ -27,6 +29,7 @@ const vaultFeatures = [
 ];
 
 const PremiumUpsell = ({ onSkip, answers }: Props) => {
+  const program = buildFocusProgram(answers);
   const [loading, setLoading] = useState(false);
   const [addBump, setAddBump] = useState(false);
   const [recoveryEmail, setRecoveryEmail] = useState('');
@@ -89,7 +92,7 @@ const PremiumUpsell = ({ onSkip, answers }: Props) => {
           Unlock the Frenchie Care Vault
         </h2>
         <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-          The free plan stays on screen. The vault adds the routine, charts, checklists, and a longer PDF after Stripe confirms payment.
+          The free plan stays yours. The vault adds <strong className="text-foreground">your {program.title}</strong>, plus the routine, charts, checklists and a longer printable PDF.
         </p>
       </motion.div>
 
@@ -246,7 +249,7 @@ const PremiumUpsell = ({ onSkip, answers }: Props) => {
           <div className="flex items-center justify-center gap-2 mt-3 py-2 px-4 rounded-lg bg-emerald-50 border border-emerald-200/50">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
             <p className="text-xs font-bold text-emerald-700">
-              Questions about a charge: hello@frenchyfab.com
+              Questions about a charge: info@frenchyfab.com
             </p>
           </div>
           <p className="text-center text-xs text-muted-foreground mt-2">

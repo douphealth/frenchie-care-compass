@@ -8,8 +8,9 @@ import { saveProfile, loadProfile } from '@/lib/profileStore';
 import { canAccessPremium } from '@/lib/entitlement';
 import { generatePDF } from '@/lib/pdfGenerator';
 import { isValidEmail, normalizeEmail } from '@/lib/quizValidation';
+import { generatePlan } from '@/lib/planGenerator';
 
-type Status = 'checking' | 'unlocked' | 'unconfirmed' | 'missing';
+type Status = 'checking' | 'unlocked' | 'unconfirmed' | 'missing' | 'error';
 
 const PaymentSuccess = () => {
   const navigate = useNavigate();
@@ -19,32 +20,48 @@ const PaymentSuccess = () => {
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
-    const sessionId = new URLSearchParams(window.location.search).get('session_id') || '';
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('session_id') || '';
+    const viaEmail = params.get('via') === 'email';
     if (!sessionId) {
       setStatus('missing');
       return;
     }
     let cancelled = false;
-    verifyCheckout(sessionId)
-      .then((entitlement) => {
+    verifyCheckout(sessionId, { fulfil: !viaEmail })
+      .then((verified) => {
         if (cancelled) return;
-        if (entitlement && canAccessPremium(entitlement)) {
-          saveProfile({ entitlement, email: entitlement.email || loadProfile().email });
+        if (verified && canAccessPremium(verified.entitlement)) {
+          const { entitlement, answers } = verified;
+          const stored = loadProfile();
+          // Opened on another device (or storage was cleared): rebuild the plan from the answers on the Stripe session.
+          const useAnswers = stored.answers && stored.plan ? stored.answers : answers;
+          saveProfile({
+            entitlement,
+            email: entitlement.email || stored.email,
+            leadCaptured: true,
+            ...(useAnswers ? { answers: useAnswers, plan: stored.plan && stored.answers ? stored.plan : generatePlan(useAnswers) } : {}),
+          });
           setStatus('unlocked');
         } else {
           setStatus('unconfirmed');
         }
       })
       .catch(() => {
-        if (!cancelled) setStatus('unconfirmed');
+        // Network or server trouble is not the same as "not paid". Say so.
+        if (!cancelled) setStatus('error');
       });
     return () => { cancelled = true; };
   }, []);
 
   const downloadVault = async () => {
     const stored = loadProfile();
-    if (!canAccessPremium(stored.entitlement) || !stored.plan || !stored.answers) {
+    if (!canAccessPremium(stored.entitlement)) {
       setStatus('unconfirmed');
+      return;
+    }
+    if (!stored.plan || !stored.answers) {
+      setRecoveryMessage('Payment confirmed, but this browser has no Frenchie profile yet. Take the 5-question quiz once and the vault opens with your answers.');
       return;
     }
     setDownloading(true);
@@ -69,7 +86,7 @@ const PaymentSuccess = () => {
       await requestPurchaseRecovery(normalizeEmail(recoveryEmail));
       setRecoveryMessage('If that email has a confirmed purchase, we sent an access link. Check your inbox.');
     } catch {
-      setRecoveryMessage('We could not send a recovery email from this server. Keep your Stripe receipt and contact hello@frenchyfab.com.');
+      setRecoveryMessage('We could not send a recovery email from this server. Keep your Stripe receipt and email info@frenchyfab.com.');
     }
   };
 
@@ -90,13 +107,14 @@ const PaymentSuccess = () => {
 
       <div className="space-y-3">
         <h1 className="text-2xl md:text-3xl font-black text-foreground font-display">
-          {status === 'unlocked' ? 'Vault unlocked' : status === 'checking' ? 'Checking payment' : 'Payment not confirmed'}
+          {status === 'unlocked' ? 'Vault unlocked' : status === 'checking' ? 'Checking payment' : status === 'error' ? 'Payment check unavailable' : 'Payment not confirmed'}
         </h1>
         <p className="text-muted-foreground text-sm max-w-sm mx-auto">
           {status === 'unlocked' && 'Stripe confirmed this purchase. Download the vault PDF, or open your plan to see the premium modules.'}
           {status === 'checking' && 'We are asking Stripe whether this checkout was paid. The vault stays locked until that check succeeds.'}
           {status === 'missing' && 'This page does not unlock anything by itself. Finish checkout, or use the recovery form with the email on your Stripe receipt.'}
           {status === 'unconfirmed' && 'Stripe did not confirm a paid session for this link. You have not been charged by this page, and the vault stays locked.'}
+          {status === 'error' && 'We could not reach the payment check just now. If you paid, your payment is safe: reload this page in a minute, or use the form below to get your access link by email.'}
         </p>
       </div>
 
@@ -108,8 +126,14 @@ const PaymentSuccess = () => {
           </Button>
         )}
         <Button onClick={() => navigate('/')} variant={status === 'unlocked' ? 'outline' : 'default'} size="lg" className="w-full h-12 rounded-xl font-bold">
-          Back to care plan
+          {status === 'unlocked' ? 'Open my vault on screen' : 'Back to care plan'}
         </Button>
+        {status === 'unlocked' && recoveryMessage && <p className="text-xs text-muted-foreground">{recoveryMessage}</p>}
+        {status === 'unlocked' && (
+          <p className="text-xs text-muted-foreground">
+            Bookmark this page: the link reopens your vault on any device. We also email it to you.
+          </p>
+        )}
       </div>
 
       {status !== 'unlocked' && status !== 'checking' && (

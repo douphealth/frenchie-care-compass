@@ -26,8 +26,8 @@ const sectionSubtitles: Record<string, string> = {
   'Exercise Plan': 'Safe activity guidelines for brachycephalic breeds',
   'Health Screening & Prevention': 'Breed-specific screenings & warning signs',
   'Health Watch-Outs': 'Breed-specific screenings & warning signs',
-  'Evidence-Based Supplement Protocol': 'Clinically-backed supplements with dosages',
-  'Supplement Recommendations': 'Clinically-backed supplements with dosages',
+  'Evidence-Based Supplement Protocol': 'Supplement questions to bring to your vet',
+  'Supplement Recommendations': 'Supplement questions to bring to your vet',
   'Home Environment & Safety': 'Climate, housing & hazard management',
   'Environment & Safety': 'Climate, housing & hazard management',
   'Leash Training & Harness Protocol': 'Step-by-step techniques to stop pulling',
@@ -40,7 +40,7 @@ const PlanResults = ({ sections, blurred = false }: Props) => (
     {sections.map((section, i) => {
       const theme = sectionThemes[i % sectionThemes.length];
       const IconComponent = theme.Icon;
-      const subtitle = sectionSubtitles[section.title] || 'Expert recommendations for your Frenchie';
+      const subtitle = sectionSubtitles[section.title] || 'Recommendations for your Frenchie';
       const isBlurred = blurred && i > 1;
 
       return (

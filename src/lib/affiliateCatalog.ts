@@ -14,8 +14,8 @@ const CATALOG: Record<string, AffiliateProduct> = {
   slowFeeder: {
     id: 'slow-feeder',
     title: 'Slow-Feeder Bowl (Maze Pattern)',
-    badge: 'Recommended for gassy Frenchies',
-    why: 'Forces 5–10× slower eating, dramatically reducing aerophagia (swallowed air) — the #1 cause of Frenchie gas.',
+    badge: 'For fast eaters',
+    why: 'Slows down gulping, which means less swallowed air. A common, low-cost fix for gas and post-meal regurgitation in flat-faced dogs.',
     url: 'https://www.amazon.com/s?k=outward+hound+slow+feeder',
     emoji: '🥣',
   },
@@ -38,7 +38,7 @@ const CATALOG: Record<string, AffiliateProduct> = {
   yHarness2: {
     id: 'y-harness-2',
     title: 'Padded No-Pull Y-Harness',
-    badge: 'Vet-recommended fit',
+    badge: 'Padded chest plate',
     why: 'Soft chest plate distributes pull pressure across the sternum, never the throat.',
     url: 'https://www.amazon.com/s?k=julius+k9+harness',
     emoji: '🐶',

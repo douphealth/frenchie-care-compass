@@ -4,7 +4,7 @@ import { Sparkles } from 'lucide-react';
 const tips = [
   'Analyzing your Frenchie\'s profile...',
   'Generating personalized recommendations...',
-  'Consulting veterinary guidelines...',
+  'Adding breed-specific heat and breathing cautions...',
   'Building your custom care plan...',
 ];
 
@@ -25,10 +25,10 @@ const LoadingScreen = () => (
 
       <div className="space-y-2">
         <h2 className="text-xl font-black text-foreground font-display">
-          Creating Your AI Care Plan
+          Building Your Frenchie's Care Plan
         </h2>
         <p className="text-sm text-muted-foreground">
-          Powered by veterinary science & AI personalization
+          Built from your answers and French Bulldog care basics
         </p>
       </div>
 

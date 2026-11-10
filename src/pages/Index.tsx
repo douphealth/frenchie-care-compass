@@ -9,7 +9,7 @@ import LoadingScreen from '@/components/LoadingScreen';
 import ExitIntentPopup from '@/components/ExitIntentPopup';
 import { quizSteps, QuizAnswers } from '@/lib/quizData';
 import { generatePlan, PlanSection } from '@/lib/planGenerator';
-import { generateAiPlan, submitLead, trackRevenueEvent } from '@/lib/revenueBackend';
+import { retryPendingLead, submitLead, trackRevenueEvent } from '@/lib/revenueBackend';
 import { loadProfile, saveProfile, clearProfile } from '@/lib/profileStore';
 import { isValidEmail, normalizeEmail, parseQuizAnswers } from '@/lib/quizValidation';
 import { toast } from '@/hooks/use-toast';
@@ -35,6 +35,8 @@ const Index = () => {
     if (stored.email) setEmail(stored.email);
     if (stored.plan) setPlan(stored.plan);
     const cancelled = new URLSearchParams(window.location.search).get('checkout') === 'cancelled';
+    if (cancelled) window.history.replaceState(null, '', window.location.pathname);
+    void retryPendingLead();
     if (cancelled) {
       setScreen('upsell');
       toast({
@@ -74,8 +76,10 @@ const Index = () => {
         return;
       }
       setScreen('loading');
-      const aiPlan = await generateAiPlan(answers);
-      const finalPlan = aiPlan || generatePlan(answers);
+      trackRevenueEvent('quiz_completed', { concern: answers.concern, life_stage: answers.lifeStage });
+      // The plan is computed locally and instantly; the short pause lets the transition read as a step.
+      await new Promise((resolve) => window.setTimeout(resolve, 1200));
+      const finalPlan = generatePlan(answers);
       setPlan(finalPlan);
       saveProfile({ plan: finalPlan, completedAt: new Date().toISOString() });
       setScreen('emailGate');
@@ -124,6 +128,9 @@ const Index = () => {
     setEmail('');
     setPlan([]);
   };
+
+  // Avoid flashing the landing page at returning visitors before their saved plan loads.
+  if (!hydrated) return null;
 
   return (
     <>
