@@ -129,6 +129,15 @@ describe('worker: /functions/v1/verify-payment', () => {
   });
 });
 
+describe('worker: unknown sessions', () => {
+  it('answers 200 paid:false when Stripe has no such session', async () => {
+    mockFetch([[/checkout\/sessions\/cs_test/, () => new Response(JSON.stringify({ error: { message: 'No such checkout.session' } }), { status: 404 })]]);
+    const res = await worker.fetch(post('/functions/v1/verify-payment', { sessionId: SESSION }), env, undefined);
+    expect(res.status).toBe(200);
+    expect((await res.json()).paid).toBe(false);
+  });
+});
+
 describe('worker: /functions/v1/create-payment', () => {
   it('creates a Checkout Session with a session-id success URL and both prices when bumped', async () => {
     const calls = mockFetch([[/checkout\/sessions$/, ok({ id: SESSION, url: 'https://checkout.stripe.com/c/pay/x' })]]);
@@ -197,5 +206,15 @@ describe('worker: lead capture', () => {
     mockFetch([]);
     const res = await worker.fetch(post('/api/ffab-care/v1/lead', { email: 'nope' }), env, undefined);
     expect(res.status).toBe(400);
+  });
+});
+
+describe('worker: static site', () => {
+  it('serves pages from the Git-connected Pages project, not the request host', async () => {
+    const calls = mockFetch([[/frenchie-care-compass\.pages\.dev\/payment-success/, () => new Response('<html><head></head></html>', { status: 200, headers: { 'content-type': 'text/html' } })]]);
+    const res = await worker.fetch(new Request('https://care-plan.frenchyfab.com/payment-success?session_id=x'), env, undefined);
+    expect(res.status).toBe(200);
+    expect(calls[0].url).toBe('https://frenchie-care-compass.pages.dev/payment-success?session_id=x');
+    expect(res.headers.get('x-robots-tag')).toBe('noindex');
   });
 });

@@ -33,7 +33,17 @@ const Index = () => {
     const stored = loadProfile();
     if (stored.answers) setAnswers(stored.answers);
     if (stored.email) setEmail(stored.email);
-    if (stored.plan) setPlan(stored.plan);
+    // Rebuild the plan from the saved answers so returning visitors get current guidance,
+    // not text cached by an older version of the app.
+    const savedAnswers = parseQuizAnswers(stored.answers);
+    if (savedAnswers && stored.plan) {
+      const fresh = generatePlan(savedAnswers);
+      stored.plan = fresh;
+      setPlan(fresh);
+      saveProfile({ plan: fresh });
+    } else if (stored.plan) {
+      setPlan(stored.plan);
+    }
     const cancelled = new URLSearchParams(window.location.search).get('checkout') === 'cancelled';
     if (cancelled) window.history.replaceState(null, '', window.location.pathname);
     void retryPendingLead();
