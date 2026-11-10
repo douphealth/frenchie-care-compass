@@ -1,7 +1,7 @@
 /**
  * care-plan.frenchyfab.com edge worker.
  *
- * Serves the static app from GitHub Pages and is the app's only backend:
+ * Serves the static app from Cloudflare Pages (STATIC_ORIGIN) and is the app's only backend:
  *   POST /functions/v1/create-payment    -> Stripe Checkout Session (signed, server-side)
  *   POST /functions/v1/verify-payment    -> asks Stripe whether a session is paid and not refunded
  *   POST /functions/v1/restore-purchase  -> emails the buyer a fresh access link (no email oracle)
@@ -29,6 +29,8 @@ export const PREMIUM_PRICE_ID = 'price_1TFD07GCqwm95OGXc26k5JkI';
 export const EMERGENCY_CARD_PRICE_ID = 'price_1THjRhGCqwm95OGXJZf9x553';
 
 const WP_ENDPOINT = 'https://frenchyfab.com/wp-json/ffab-care/v1';
+/** Git-connected Cloudflare Pages project: every merge to main deploys here. */
+const STATIC_ORIGIN = 'https://frenchie-care-compass.pages.dev';
 const LEAD_STORE = 'https://app-lead-capture.papalexios.workers.dev/app/frenchyfab';
 const LEGACY_SUPABASE = 'https://zyxsijqazzhuudhmfitw.supabase.co';
 const LEGACY_LOVABLE = 'https://frenchie-care-compass.lovable.app';
@@ -290,7 +292,8 @@ async function verifyPayment(request, env, ctx) {
   try {
     session = await retrieveSession(env, sessionId);
   } catch (error) {
-    if (error.status === 404) return json(request, { paid: false, sessionId, error: 'Unknown session' }, 404);
+    // Stripe says no such session: a definite "not paid", not an outage.
+    if (error.status === 404) return json(request, { paid: false, refunded: false, sessionId, error: 'Unknown session' });
     console.error('verify-payment', error.message);
     return json(request, { error: 'Unable to reach Stripe' }, 502);
   }
@@ -429,14 +432,17 @@ function rewriteLegacy(body) {
 
 async function serveStatic(request, url) {
   const method = request.method === 'HEAD' ? 'GET' : request.method;
-  let res = await fetch(new Request(request, { method, redirect: 'follow' }));
+  const headers0 = new Headers(request.headers);
+  headers0.delete('host');
+  headers0.delete('cookie');
+  let res = await fetch(`${STATIC_ORIGIN}${url.pathname}${url.search}`, { method, headers: headers0, redirect: 'follow' });
   // Hosts that answer unknown paths with the SPA shell return HTML here, not a 404.
   if (url.pathname === '/og-image.png' && !(res.ok && (res.headers.get('content-type') || '').startsWith('image/'))) {
     res = await fetch(LEGACY_PREVIEW_IMAGE);
   }
   // SPA routes such as /payment-success: serve the app shell instead of the host's 404.
   if (res.status === 404 && method === 'GET' && !/\.[a-z0-9]{2,5}$/i.test(url.pathname)) {
-    const shell = await fetch(new URL('/index.html', url).toString());
+    const shell = await fetch(`${STATIC_ORIGIN}/index.html`);
     if (shell.ok) res = new Response(shell.body, { status: 200, headers: shell.headers });
   }
   const headers = new Headers(res.headers);
