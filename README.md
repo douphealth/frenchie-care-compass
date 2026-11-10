@@ -7,8 +7,8 @@ https://care-plan.frenchyfab.com.
 
 | Piece | Where | What it does |
 | --- | --- | --- |
-| App (Vite + React) | `src/` → built to `dist/` → `gh-pages` branch | Quiz, free plan, PDF/ICS export, vault UI. The plan is computed in the browser (`src/lib/planGenerator.ts`). |
-| Edge worker | `worker/careplan-proxy.js` (Cloudflare Worker on `care-plan.frenchyfab.com/*`) | Serves the GitHub Pages build (with SPA fallback) and is the only backend: Stripe checkout, payment verification, purchase recovery, lead capture to Brevo. |
+| App (Vite + React) | `src/` → Cloudflare Pages project `frenchie-care-compass` (builds `main` with `npm run build`, output `dist/`) | Quiz, free plan, PDF/ICS export, vault UI. The plan is computed in the browser (`src/lib/planGenerator.ts`). |
+| Edge worker | `worker/careplan-proxy.js` (Cloudflare Worker on `care-plan.frenchyfab.com/*`) | Sits in front of the Pages build (`care-plan` CNAME → `frenchie-care-compass.gearup-flow-master.pages.dev`) and is the only backend: Stripe checkout, payment verification, purchase recovery, lead capture to Brevo. |
 | Stripe | `PREMIUM_PRICE_ID`, `EMERGENCY_CARD_PRICE_ID` in `src/lib/stripeConfig.ts` and the worker | Checkout Sessions created by the worker. Payment Links are only a fallback. |
 
 ## Free vs paid
@@ -57,7 +57,10 @@ To exercise the real worker from local dev: `VITE_API_BASE=https://care-plan.fre
 ## Deploy
 
 * Worker: `cd worker && npx wrangler deploy`
-* App: `npm run build`, then publish `dist/` to the `gh-pages` branch (keep `CNAME`).
+* App: merge to `main`. Cloudflare Pages runs `npm ci` with **npm 10**, so regenerate `package-lock.json` with
+  `npx npm@10 install` after dependency changes (an npm 11 lockfile left out a peer and broke every build from May to November).
+  Then purge the cache for `care-plan.frenchyfab.com`.
+* The `gh-pages` branch is not what the domain serves.
 
 ## Content rules
 
