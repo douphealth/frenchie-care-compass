@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { RefreshCcw, Share2, Download, Star, Shield, Award, Printer, CalendarPlus, ChevronRight } from 'lucide-react';
+import { RefreshCcw, Share2, Download, Loader2, Star, Shield, Award, Printer, CalendarPlus, ChevronRight } from 'lucide-react';
 import PlanResults from './PlanResults';
 import { PlanSection } from '@/lib/planGenerator';
 import { QuizAnswers } from '@/lib/quizData';
@@ -16,7 +16,9 @@ import LeadGateModal from './LeadGateModal';
 import { buildIcs, downloadIcs } from '@/lib/icsGenerator';
 import { loadProfile, saveProfile } from '@/lib/profileStore';
 import { canAccessPremium, Entitlement } from '@/lib/entitlement';
-import { verifyCheckout } from '@/lib/revenueBackend';
+import { fetchVaultPack, verifyCheckout } from '@/lib/revenueBackend';
+import { publicFocusTitle } from '@/lib/publicFocus';
+import type { VaultPack } from '@/lib/vaultPack';
 import { toast } from '@/hooks/use-toast';
 
 type Props = {
@@ -33,11 +35,13 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
   const [heatZone, setHeatZone] = useState<'safe' | 'caution' | 'danger' | 'emergency'>('safe');
   const [gate, setGate] = useState<GateAction>(null);
   const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [vault, setVault] = useState<VaultPack | null>(null);
+  const [vaultState, setVaultState] = useState<'idle' | 'loading' | 'error'>('idle');
 
   const stored = useMemo(() => loadProfile(), []);
   const hasLead = !!stored.leadCaptured || !!stored.email;
   const premium = canAccessPremium(entitlement);
-  // A purchase is on record but has not been re-confirmed with Stripe yet (checking, or the check failed).
   const [recheck, setRecheck] = useState<'idle' | 'checking' | 'failed'>(stored.entitlement ? 'checking' : 'idle');
   const purchaseOnRecord = Boolean(stored.entitlement) && !premium;
 
@@ -54,7 +58,6 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
           saveProfile({ entitlement: next });
           setRecheck('idle');
         } else {
-          // Stripe answered: not paid, or refunded.
           saveProfile({ entitlement: undefined });
           setRecheck('idle');
         }
@@ -68,29 +71,89 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
     return () => { cancelled = true; };
   }, [stored.entitlement?.sessionId]);
 
+  useEffect(() => {
+    if (!premium || !entitlement?.sessionId) {
+      setVault(null);
+      setVaultState('idle');
+      return;
+    }
+    let cancelled = false;
+    setVaultState('loading');
+    fetchVaultPack(entitlement.sessionId, answers)
+      .then((pack) => {
+        if (cancelled) return;
+        setVault(pack);
+        setVaultState('idle');
+      })
+      .catch(() => {
+        if (!cancelled) setVaultState('error');
+      });
+    return () => { cancelled = true; };
+  }, [premium, entitlement?.sessionId, answers]);
+
   const urgentReason =
     boasLevel === 'urgent' ? 'Your Frenchie\'s breathing scorecard is in the urgent range.'
     : heatZone === 'emergency' ? 'Current temperature is in the emergency zone for flat-faced breeds.'
     : null;
 
   const handleShare = async () => {
-    if (typeof navigator.share === 'function') {
-      await navigator.share({ title: 'My Frenchie Care Plan', text: 'Check out my personalized French Bulldog care plan!', url: window.location.href });
+    try {
+      if (typeof navigator.share === 'function') {
+        await navigator.share({
+          title: 'My Frenchie Care Plan',
+          text: 'Check out my personalized French Bulldog care plan!',
+          url: window.location.href,
+        });
+        return;
+      }
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(window.location.href);
+        toast({ title: 'Link copied', description: 'Care plan URL copied to your clipboard.' });
+      }
+    } catch (error) {
+      if ((error as { name?: string })?.name !== 'AbortError') {
+        toast({ title: 'Unable to share', description: 'Copy the URL from your browser address bar.', variant: 'destructive' });
+      }
     }
   };
 
   const runDownloadPdf = async () => {
-    const { generatePDF } = await import('@/lib/pdfGenerator');
-    await generatePDF(plan, answers, {
-      tier: premium ? 'premium' : 'free',
-      includeEmergencyCard: Boolean(entitlement?.includeEmergencyCard),
-    });
+    if (pdfLoading) return;
+    setPdfLoading(true);
+    try {
+      const { generatePDF } = await import('@/lib/pdfGenerator');
+      await generatePDF(plan, answers, {
+        tier: premium ? 'premium' : 'free',
+        includeEmergencyCard: Boolean(entitlement?.includeEmergencyCard),
+        program: vault?.program ?? null,
+      });
+      toast({
+        title: premium ? 'Vault PDF downloaded' : 'Free Care Plan PDF downloaded',
+        description: premium && !vault?.program
+          ? 'The 4-week program page was left out because the server did not return it. The rest of the PDF is in your downloads.'
+          : 'Check your downloads folder for your printable PDF.',
+      });
+    } catch (error) {
+      console.error('PDF generation failed:', error);
+      toast({
+        title: 'PDF export failed',
+        description: 'Please try again or use the Print button to save as PDF.',
+        variant: 'destructive',
+      });
+    } finally {
+      setPdfLoading(false);
+    }
   };
 
   const runDownloadIcs = () => {
     const ics = buildIcs(answers);
     downloadIcs('frenchie-care-plan.ics', ics);
     toast({ title: 'Calendar downloaded', description: 'Open the .ics file to sync with Google / Apple Calendar.' });
+  };
+
+  const handlePrint = () => {
+    toast({ title: 'Opening print view', description: 'Select "Save as PDF" or your printer in the dialog.' });
+    window.print();
   };
 
   const requestAction = (action: GateAction) => {
@@ -112,20 +175,23 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
       <div className="px-5 py-6 max-w-lg mx-auto">
         {/* Hero Header */}
         <motion.div
-          initial={{ opacity: 0, y: -16 }}
+          initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.4 }}
           className="text-center mb-6"
         >
           <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 15, delay: 0.1 }}
+            initial={{ scale: 0.85, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 18 }}
             className="inline-flex items-center justify-center w-16 h-16 rounded-2xl premium-gradient shadow-xl mb-3"
           >
             <span className="text-3xl">🐾</span>
           </motion.div>
 
+          <div className="flex justify-end mb-2">
+            <a href="/account" className="text-xs font-bold text-muted-foreground hover:text-foreground">Account</a>
+          </div>
           <h1 className="text-2xl md:text-3xl font-black text-foreground font-display leading-tight">
             Your Personalized
             <br />
@@ -171,7 +237,16 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
         <AffiliateGrid answers={answers} />
 
         {/* Locked Premium Modules Preview */}
-        <div className="no-print"><LockedModules onUpgrade={onUpgrade} unlocked={premium} answers={answers} /></div>
+        <div className="no-print">
+          <LockedModules
+            onUpgrade={onUpgrade}
+            unlocked={premium}
+            teaserTitle={publicFocusTitle(answers.concern)}
+            program={vault?.program}
+            modules={vault?.modules}
+            vaultState={vaultState}
+          />
+        </div>
 
         {/* Action buttons (lead-gated) */}
         <div className="no-print mt-6 grid grid-cols-1 gap-3">
@@ -186,14 +261,15 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
           <div className="grid grid-cols-2 gap-3">
             <Button
               onClick={() => requestAction('pdf')}
+              disabled={pdfLoading}
               variant="outline"
               className="h-12 rounded-xl font-bold gap-2 border-2"
             >
-              <Download className="w-4 h-4" />
-              {premium ? 'Vault PDF' : 'Free PDF'}
+              {pdfLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              {pdfLoading ? 'Building PDF...' : premium ? 'Vault PDF' : 'Free PDF'}
             </Button>
             <Button
-              onClick={() => window.print()}
+              onClick={handlePrint}
               variant="outline"
               className="h-12 rounded-xl font-bold gap-2 border-2"
             >
@@ -218,9 +294,9 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
         )}
         {!premium && !(purchaseOnRecord && recheck !== 'idle') && (
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.25 }}
           className="no-print mt-5 relative overflow-hidden rounded-2xl border-2 border-warning/60 bg-gradient-to-br from-warning/10 via-warning/5 to-card p-6"
         >
           <div className="relative">
@@ -253,12 +329,10 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
             <RefreshCcw className="w-4 h-4" />
             Start Over
           </Button>
-          {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
-            <Button onClick={handleShare} variant="outline" className="rounded-xl gap-2 h-11">
-              <Share2 className="w-4 h-4" />
-              Share Plan
-            </Button>
-          )}
+          <Button onClick={handleShare} variant="outline" className="rounded-xl gap-2 h-11">
+            <Share2 className="w-4 h-4" />
+            Share Plan
+          </Button>
         </div>
 
         {/* FrenchyFab link */}

@@ -1,6 +1,7 @@
 import { QuizAnswers } from './quizData';
 import { PlanSection } from './planGenerator';
 import { Entitlement, acceptServerVerification } from './entitlement';
+import type { VaultPack } from './vaultPack';
 import { PAYMENT_LINKS } from './stripeConfig';
 import { isValidEmail, normalizeEmail, parseQuizAnswers } from './quizValidation';
 
@@ -101,6 +102,7 @@ async function postLead(path: string, body: Record<string, unknown>) {
 async function callFunction<T>(name: string, body: Record<string, unknown>): Promise<T> {
   const response = await withTimeout(fetch(`${API_BASE}/functions/v1/${name}`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }));
@@ -184,6 +186,22 @@ export async function verifyCheckout(sessionId: string, opts: { fulfil?: boolean
   if (!entitlement) return null;
   trackRevenueEvent('payment_verified', { include_emergency_card: entitlement.includeEmergencyCard });
   return { entitlement, answers: parseQuizAnswers(data.answers) };
+}
+
+/** Paid modules and the 4-week program. The server checks Stripe before returning them. */
+export async function fetchVaultPack(sessionId: string, answers?: QuizAnswers): Promise<VaultPack> {
+  const data = await callFunction<{ pack?: VaultPack }>('vault-content', { sessionId, answers });
+  if (!data.pack?.program || !Array.isArray(data.pack.modules)) throw new Error('Vault content missing');
+  return data.pack;
+}
+
+/** Stripe Customer Portal for receipts and refunds. One-time purchases have no subscription to cancel. */
+export async function openBillingPortal(sessionId: string): Promise<string> {
+  const data = await callFunction<{ url?: unknown }>('billing-portal', { sessionId });
+  if (typeof data.url !== 'string' || !data.url.startsWith('https://billing.stripe.com/')) {
+    throw new Error('Billing portal is unavailable');
+  }
+  return data.url;
 }
 
 /** Asks the server to email a recovery link. The response never includes entitlement. */

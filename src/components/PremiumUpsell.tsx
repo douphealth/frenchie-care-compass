@@ -7,7 +7,7 @@ import { QuizAnswers } from '@/lib/quizData';
 import { isValidEmail, normalizeEmail } from '@/lib/quizValidation';
 import FeatureComparison from './FeatureComparison';
 import SocialProof from './SocialProof';
-import { buildFocusProgram } from '@/lib/focusProgram';
+import { publicFocusTitle } from '@/lib/publicFocus';
 
 type Props = {
   onSkip: () => void;
@@ -29,7 +29,7 @@ const vaultFeatures = [
 ];
 
 const PremiumUpsell = ({ onSkip, answers }: Props) => {
-  const program = buildFocusProgram(answers);
+  const programTitle = publicFocusTitle(answers.concern);
   const [loading, setLoading] = useState(false);
   const [addBump, setAddBump] = useState(false);
   const [recoveryEmail, setRecoveryEmail] = useState('');
@@ -88,11 +88,11 @@ const PremiumUpsell = ({ onSkip, answers }: Props) => {
             <Crown className="w-8 h-8 text-primary-foreground" />
           </div>
         </motion.div>
-        <h2 className="text-2xl md:text-3xl font-black text-foreground font-display">
+        <h1 className="text-2xl md:text-3xl font-black text-foreground font-display">
           Unlock the Frenchie Care Vault
-        </h2>
+        </h1>
         <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-          The free plan stays yours. The vault adds <strong className="text-foreground">your {program.title}</strong>, plus the routine, charts, checklists and a longer printable PDF.
+          The free plan stays yours. The vault adds <strong className="text-foreground">your {programTitle}</strong>, plus the routine, charts, checklists and a longer printable PDF.
         </p>
       </motion.div>
 

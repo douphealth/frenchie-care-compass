@@ -3,7 +3,7 @@ import { PlanSection } from './planGenerator';
 import { QuizAnswers } from './quizData';
 import { buildMER } from './clinical';
 import { includedPremiumPages, PdfTier } from './pdfOutline';
-import { buildFocusProgram } from './focusProgram';
+import type { FocusProgram } from './focusProgram';
 import frenchieHeroUrl from '@/assets/frenchie-hero.png';
 import frenchieFaceUrl from '@/assets/frenchie-face.png';
 import pawIconUrl from '@/assets/paw-icon.png';
@@ -147,7 +147,7 @@ function getMealsPerDay(stage: string): number { return stage === 'puppy' ? 3 : 
 export async function generatePDF(
   plan: PlanSection[],
   answers: QuizAnswers,
-  options?: { tier?: PdfTier; includeEmergencyCard?: boolean },
+  options?: { tier?: PdfTier; includeEmergencyCard?: boolean; program?: FocusProgram | null },
 ): Promise<void> {
   const tier: PdfTier = options?.tier === 'premium' ? 'premium' : 'free';
   const premiumPages = new Set(includedPremiumPages(tier, Boolean(options?.includeEmergencyCard)));
@@ -634,8 +634,8 @@ export async function generatePDF(
   /* ═══════════════════════════════════════════════
    * 4-WEEK FOCUS PROGRAM (main concern) — vault centrepiece
    * ═══════════════════════════════════════════════ */
-  if (premiumPages.has('focus-program')) {
-    const program = buildFocusProgram(answers);
+  if (premiumPages.has('focus-program') && options?.program) {
+    const program = options.program;
     doc.addPage();
     newPageBg();
     y = 20;

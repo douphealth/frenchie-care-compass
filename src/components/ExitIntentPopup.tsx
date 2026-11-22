@@ -21,17 +21,9 @@ const ExitIntentPopup = ({ onStartQuiz }: Props) => {
       }
     };
 
-    // Also trigger after 45 seconds of inactivity
-    const timer = setTimeout(() => {
-      if (!sessionStorage.getItem('exit_intent_dismissed')) {
-        setShow(true);
-      }
-    }, 45000);
-
     document.addEventListener('mouseleave', handler);
     return () => {
       document.removeEventListener('mouseleave', handler);
-      clearTimeout(timer);
     };
   }, []);
 
@@ -56,11 +48,14 @@ const ExitIntentPopup = ({ onStartQuiz }: Props) => {
             exit={{ scale: 0.9, opacity: 0, y: 20 }}
             transition={{ type: 'spring', stiffness: 350, damping: 25 }}
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="exit-intent-title"
             className="relative w-full max-w-sm rounded-3xl overflow-hidden bg-card border-2 border-border shadow-2xl"
           >
             {/* Header */}
             <div className="premium-gradient px-6 pt-8 pb-6 text-center">
-              <button onClick={dismiss} className="absolute top-3 right-3 text-primary-foreground/70 hover:text-primary-foreground">
+              <button type="button" onClick={dismiss} aria-label="Close" className="absolute top-3 right-3 text-primary-foreground/70 hover:text-primary-foreground">
                 <X className="w-5 h-5" />
               </button>
               <motion.div
@@ -69,11 +64,11 @@ const ExitIntentPopup = ({ onStartQuiz }: Props) => {
               >
                 <Gift className="w-12 h-12 text-primary-foreground mx-auto mb-3" />
               </motion.div>
-              <h3 className="text-xl font-black text-primary-foreground font-display">
-                Wait! Don't Miss Out
-              </h3>
+              <h2 id="exit-intent-title" className="text-xl font-black text-primary-foreground font-display">
+                Your free plan is still here
+              </h2>
               <p className="text-sm text-primary-foreground/80 mt-1">
-                Your Frenchie deserves the best care
+                It takes about a minute, and it stays free
               </p>
             </div>
 

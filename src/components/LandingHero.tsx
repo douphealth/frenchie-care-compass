@@ -22,13 +22,16 @@ const coverageItems = [
 const audienceTags = ['Puppies', 'Adults', 'Seniors', 'First-time owners', 'Hot climates'];
 
 const LandingHero = ({ onStart }: Props) => (
-  <div className="min-h-screen flex flex-col items-center justify-center px-5 py-10 md:py-16">
+  <div className="relative min-h-screen flex flex-col items-center justify-center px-5 py-10 md:py-16">
+      <a href="/account" className="absolute top-4 right-4 text-xs font-bold text-muted-foreground hover:text-foreground">
+        Account
+      </a>
     <div className="max-w-lg w-full text-center space-y-6">
       {/* Hero image */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
+        initial={{ opacity: 0, scale: 0.94 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
         className="relative mx-auto w-36 h-36 md:w-48 md:h-48"
       >
         <div className="absolute inset-0 rounded-full bg-secondary/20 blur-2xl" />
@@ -44,23 +47,14 @@ const LandingHero = ({ onStart }: Props) => (
       </motion.div>
 
       {/* Authority badge */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.1 }}
-      >
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-secondary bg-secondary/10 px-3 py-1.5 rounded-full border border-secondary/20">
+      <div>
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-primary bg-secondary/10 px-3 py-1.5 rounded-full border border-secondary/20">
           From the team behind FrenchyFab
         </span>
-      </motion.div>
+      </div>
 
       {/* Copy */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.15 }}
-        className="space-y-3"
-      >
+      <div className="space-y-3">
         <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-foreground leading-tight font-display">
           Get Your Frenchie's{' '}
           <span className="text-gradient">Personalized Care Plan</span>{' '}
@@ -69,72 +63,47 @@ const LandingHero = ({ onStart }: Props) => (
         <p className="text-muted-foreground text-sm md:text-base leading-relaxed max-w-md mx-auto">
           Build a breed-specific routine for feeding, exercise, skin care, heat safety, and health watchouts — based on your French Bulldog's age, lifestyle, and needs.
         </p>
-      </motion.div>
+      </div>
 
       {/* What it covers */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.25 }}
-        className="flex flex-wrap items-center justify-center gap-2"
-      >
+      <div className="flex flex-wrap items-center justify-center gap-2">
         {coverageItems.map(({ icon: Icon, text }) => (
-          <div key={text} className="flex items-center gap-1.5 text-xs font-bold text-foreground/70 bg-muted/60 px-2.5 py-1.5 rounded-lg border border-border/50">
+          <div key={text} className="flex items-center gap-1.5 text-xs font-bold text-foreground/85 bg-muted/70 px-2.5 py-1.5 rounded-lg border border-border/60">
             <Icon className="w-3.5 h-3.5 text-secondary" />
             {text}
           </div>
         ))}
-      </motion.div>
+      </div>
 
       {/* Badges */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.3 }}
-        className="flex items-center justify-center gap-3 md:gap-4"
-      >
+      <div className="flex items-center justify-center gap-3 md:gap-4">
         {badges.map(({ icon: Icon, text }) => (
           <div key={text} className="flex items-center gap-1.5 text-xs md:text-sm text-muted-foreground">
             <Icon className="w-3.5 h-3.5 text-secondary" />
             <span className="font-semibold">{text}</span>
           </div>
         ))}
-      </motion.div>
+      </div>
 
       {/* Trust signals */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.4 }}
-        className="flex items-center justify-center gap-2"
-      >
+      <div className="flex items-center justify-center gap-2">
         <p className="text-xs text-muted-foreground">
           <span className="font-bold text-foreground">Free to start</span> · Email saves your plan · Not a substitute for vet care
         </p>
-      </motion.div>
+      </div>
 
       {/* Who it's for */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.45 }}
-        className="flex flex-wrap items-center justify-center gap-1.5"
-      >
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mr-1">Built for:</span>
         {audienceTags.map(tag => (
-          <span key={tag} className="text-[10px] font-bold text-muted-foreground/80 bg-muted/40 px-2 py-0.5 rounded-full">
+          <span key={tag} className="text-[10px] font-bold text-foreground/80 bg-muted/50 px-2 py-0.5 rounded-full">
             {tag}
           </span>
         ))}
-      </motion.div>
+      </div>
 
       {/* CTA */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.5 }}
-        className="space-y-2"
-      >
+      <div className="space-y-2">
         <Button
           onClick={onStart}
           size="lg"
@@ -143,23 +112,18 @@ const LandingHero = ({ onStart }: Props) => (
           <PawPrint className="w-5 h-5" />
           Get My Free Plan
         </Button>
-        <p className="text-[10px] text-muted-foreground/60">
+        <p className="text-[10px] text-muted-foreground">
           One-time result · Personalized to your answers
         </p>
-      </motion.div>
+      </div>
 
       {/* FrenchyFab link */}
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.55 }}
-        className="text-[11px] text-muted-foreground"
-      >
+      <p className="text-[11px] text-muted-foreground">
         More breed-specific guides & product picks at{' '}
         <a href="https://frenchyfab.com" target="_blank" rel="noopener noreferrer" className="font-bold text-secondary hover:underline">
           FrenchyFab.com
         </a>
-      </motion.p>
+      </p>
     </div>
   </div>
 );

@@ -1,0 +1,15 @@
+export const COMPARISON_FEATURES = [
+  { name: 'Personalized care plan', free: true, premium: true },
+  { name: 'Feeding recommendations', free: true, premium: true },
+  { name: 'Grooming routine', free: true, premium: true },
+  { name: 'Exercise guidelines', free: true, premium: true },
+  { name: 'Safety product notes', free: true, premium: true },
+  { name: '4-week focus program for your main concern', free: false, premium: true },
+  { name: 'Custom feeding charts & portions', free: false, premium: true },
+  { name: 'Printable grooming checklist', free: false, premium: true },
+  { name: 'Seasonal care calendar', free: false, premium: true },
+  { name: 'Vet visit prep sheets', free: false, premium: true },
+  { name: 'Emergency red-flag checklist', free: false, premium: true },
+  { name: '"When to call the vet" guide', free: false, premium: true },
+  { name: 'Vault PDF with charts and checklists', free: false, premium: true },
+] as const;

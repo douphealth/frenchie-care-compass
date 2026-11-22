@@ -2,42 +2,66 @@
  * care-plan.frenchyfab.com edge worker.
  *
  * Serves the static app from Cloudflare Pages (STATIC_ORIGIN) and is the app's only backend:
- *   POST /functions/v1/create-payment    -> Stripe Checkout Session (signed, server-side)
+ *   POST /functions/v1/create-payment    -> Stripe Checkout Session (signed, server-side, stores quiz metadata)
  *   POST /functions/v1/verify-payment    -> asks Stripe whether a session is paid and not refunded
  *   POST /functions/v1/restore-purchase  -> emails the buyer a fresh access link (no email oracle)
+ *   POST /functions/v1/stripe-webhook    -> verified Stripe webhook (paid, refunded, disputed)
+ *   POST /functions/v1/vault-content     -> paid vault copy, only after Stripe says the session is paid
+ *   POST /functions/v1/billing-portal    -> Stripe Customer Portal for receipts and refunds
+ *   POST /functions/v1/auth/*            -> email/password account (requires CAREPLAN_KV)
+ *   GET  /api/ffab-care/v1/health        -> boolean readiness check (no secret values exposed)
  *   POST /api/ffab-care/v1/lead          -> lead capture (Brevo list + central lead store)
  *   *    /api/ffab-care/v1/*             -> proxied to the FrenchyFab WordPress REST namespace
  *
  * Secrets / vars / bindings (Cloudflare dashboard -> Workers -> this worker -> Settings):
- *   STRIPE_SECRET_KEY   secret. Restricted key with Checkout Sessions read is the minimum
- *                       (verify + recovery). Checkout Sessions write lets the worker create
- *                       sessions itself; without it, set CHECKOUT_VIA_LINKS=1 and the app
- *                       uses the Stripe Payment Links (which return with {CHECKOUT_SESSION_ID}).
- *   CAREPLAN_KV         optional KV namespace for "access email sent" / recovery cooldown.
- *                       Without it the edge cache (caches.default) holds those markers.
- *   CHECKOUT_VIA_LINKS  "1" = skip session creation and let the app use Payment Links.
- *   BREVO_API_KEY       secret. Used for the list sync and the access-link emails.
- *   BREVO_LIST_ID       optional, defaults to 8.
- *   MAIL_FROM           optional, defaults to info@frenchyfab.com (must be a Brevo-verified sender).
- *
- * Without STRIPE_SECRET_KEY the payment routes answer 503 and the app falls back to the
- * Stripe Payment Links. Nothing on this worker ever unlocks premium without Stripe saying "paid".
+ *   STRIPE_SECRET_KEY     secret. Restricted key with Checkout Sessions read+write.
+ *   STRIPE_WEBHOOK_SECRET secret. Signing secret (whsec_...) for /functions/v1/stripe-webhook.
+ *   CAREPLAN_KV           KV namespace for accounts, entitlements, email dedupe, and rate limits.
+ *                         Without it, fulfilment email is skipped and accounts return 503.
+ *                         Recovery cooldowns fall back to the edge cache.
+ *   CHECKOUT_VIA_LINKS    "0" (default) = dynamic Checkout Sessions; "1" = force static Payment Links.
+ *   BREVO_API_KEY         secret. Used for the list sync and the access-link emails.
+ *   BREVO_LIST_ID         optional, defaults to 8.
+ *   MAIL_FROM             optional, defaults to info@frenchyfab.com (must be a Brevo-verified sender).
  */
+
+import { buildVaultPack } from '../src/lib/vaultPack.ts';
+import { readAuthSession, routeAuth } from './auth.js';
 
 export const PUBLIC_ORIGIN = 'https://care-plan.frenchyfab.com';
 export const PREMIUM_PRICE_ID = 'price_1TFD07GCqwm95OGXc26k5JkI';
 export const EMERGENCY_CARD_PRICE_ID = 'price_1THjRhGCqwm95OGXJZf9x553';
 
 const WP_ENDPOINT = 'https://frenchyfab.com/wp-json/ffab-care/v1';
-/** Git-connected Cloudflare Pages project: every merge to main deploys here. */
+/**
+ * Static origin for this repo.
+ * Pages project `frenchie-care-compass` in account 284f1a03e12aa7416ab177db3f692c17
+ * publishes main to https://frenchie-care-compass.pages.dev.
+ * DNS for care-plan.frenchyfab.com is a CNAME to frenchie-care-compass.gearup-flow-master.pages.dev,
+ * a branch alias of the different Pages project `gearup-flow-master` in account 5dc0401c38d9de0c6947fee40a210937.
+ * The worker route intercepts the hostname and fetches STATIC_ORIGIN, so the CNAME is not the HTML origin.
+ * Do not point STATIC_ORIGIN at the gearup-flow-master alias.
+ */
 const STATIC_ORIGIN = 'https://frenchie-care-compass.pages.dev';
 const LEAD_STORE = 'https://app-lead-capture.papalexios.workers.dev/app/frenchyfab';
-const LEGACY_SUPABASE = 'https://zyxsijqazzhuudhmfitw.supabase.co';
-const LEGACY_LOVABLE = 'https://frenchie-care-compass.lovable.app';
-const LEGACY_PREVIEW_IMAGE = 'https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/a16fe0ea-6047-405d-be60-be21b4d9cf2a/id-preview-6a18becc--b482264c-d3a9-4d34-8494-65bbdfbb0069.lovable.app-1774460137350.png';
 const DEV_ORIGINS = ['http://localhost:8080', 'http://127.0.0.1:8080'];
 const RECOVERY_COOLDOWN_S = 10 * 60;
+const WEBHOOK_TOLERANCE_S = 5 * 60;
 const SUPPORT_EMAIL = 'info@frenchyfab.com';
+const WORKER_VERSION = 'worker-2026-11-22';
+
+const SECURITY_CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com data:",
+  "img-src 'self' data: blob: https://care-plan.frenchyfab.com",
+  "connect-src 'self' https://care-plan.frenchyfab.com",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self' https://checkout.stripe.com https://buy.stripe.com",
+  'upgrade-insecure-requests',
+].join('; ');
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -50,17 +74,29 @@ function corsHeaders(request) {
   return {
     'access-control-allow-origin': allowedOrigin(request),
     'access-control-allow-methods': 'GET,POST,OPTIONS',
-    'access-control-allow-headers': 'content-type, authorization, x-requested-with',
+    'access-control-allow-headers': 'content-type, authorization, x-requested-with, stripe-signature',
+    'access-control-allow-credentials': 'true',
     'access-control-max-age': '86400',
     vary: 'origin',
   };
 }
 
-function json(request, body, status = 200) {
+function json(request, body, status = 200, extra) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...corsHeaders(request) },
+    headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...corsHeaders(request), ...(extra || {}) },
   });
+}
+
+async function rateLimit(request, env, bucket, limit) {
+  const kv = env.CAREPLAN_KV;
+  if (!kv) return null;
+  const ip = request.headers.get('cf-connecting-ip') || 'local';
+  const key = `rl:${bucket}:${ip}`;
+  const current = Number(await kv.get(key) || '0');
+  if (current >= limit) return json(request, { error: 'Too many requests. Wait a minute and try again.' }, 429);
+  await kv.put(key, String(current + 1), { expirationTtl: 60 });
+  return null;
 }
 
 async function readJson(request) {
@@ -179,9 +215,55 @@ function sessionAnswers(session) {
   }
 }
 
+function constantTimeEqualHex(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+/**
+ * Verifies a Stripe-Signature header (t=...,v1=...) using Web Crypto HMAC-SHA256.
+ * Rejects tampered payloads and timestamps outside `toleranceSec` (default 5 minutes).
+ */
+export async function verifyStripeSignature(payload, sigHeader, secret, nowSec = Math.floor(Date.now() / 1000), toleranceSec = WEBHOOK_TOLERANCE_S) {
+  if (!payload || !sigHeader || !secret) return false;
+  const parts = sigHeader.split(',').map((p) => p.trim());
+  let timestamp = '';
+  const signatures = [];
+  for (const part of parts) {
+    const eq = part.indexOf('=');
+    if (eq === -1) continue;
+    const key = part.slice(0, eq);
+    const val = part.slice(eq + 1);
+    if (key === 't') timestamp = val;
+    if (key === 'v1' && val) signatures.push(val);
+  }
+  const ts = Number(timestamp);
+  if (!Number.isFinite(ts) || signatures.length === 0) return false;
+  if (Math.abs(nowSec - ts) > toleranceSec) return false;
+
+  const encoder = new TextEncoder();
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const mac = await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(`${timestamp}.${payload}`));
+  const expectedHex = Array.from(new Uint8Array(mac))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+
+  return signatures.some((sig) => constantTimeEqualHex(sig, expectedHex));
+}
+
 /**
  * Returns true the first time it is called for `key` (and records it), false afterwards.
- * Without a KV binding it cannot remember anything, so it returns `fallback`.
+ * Without a KV binding it falls back to per-PoP edge cache, or `fallback` when no cache exists.
  */
 async function firstTime(env, key, ttlSeconds, fallback) {
   const kv = env.CAREPLAN_KV;
@@ -190,7 +272,6 @@ async function firstTime(env, key, ttlSeconds, fallback) {
     await kv.put(key, new Date().toISOString(), ttlSeconds ? { expirationTtl: ttlSeconds } : undefined);
     return true;
   }
-  // Edge cache marker: per data centre and best effort, but enough to stop repeats on reloads.
   const cache = typeof caches !== 'undefined' ? caches.default : undefined;
   if (cache) {
     const marker = new Request(`${PUBLIC_ORIGIN}/__marker/${encodeURIComponent(key)}`);
@@ -231,7 +312,7 @@ async function sendVaultEmail(env, to, sessionId, heading) {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'api-key': env.BREVO_API_KEY },
     body: JSON.stringify({
-      sender: { email: env.MAIL_FROM || SUPPORT_EMAIL, name: 'Frenchy Fab' },
+      sender: { email: env.MAIL_FROM || SUPPORT_EMAIL, name: 'FrenchyFab' },
       replyTo: { email: SUPPORT_EMAIL },
       to: [{ email: to }],
       subject: 'Your Frenchie Care Vault access link',
@@ -241,9 +322,65 @@ async function sendVaultEmail(env, to, sessionId, heading) {
   if (!res.ok) throw new Error(`Brevo send failed with ${res.status}`);
 }
 
+/* ------------------------------------------------------------ entitlements */
+
+async function rememberEntitlement(env, session) {
+  const kv = env.CAREPLAN_KV;
+  if (!kv || !session?.id) return;
+  const email = sessionEmail(session);
+  const paid = isPaidVaultSession(session);
+  const paymentIntent = session.payment_intent;
+  const paymentIntentId = typeof paymentIntent === 'string' ? paymentIntent : paymentIntent?.id || null;
+  const record = {
+    sessionId: session.id,
+    email,
+    paid,
+    refunded: chargeRefunded(session),
+    includeEmergencyCard: paid && sessionPriceIds(session).includes(EMERGENCY_CARD_PRICE_ID),
+    customerId: typeof session.customer === 'string' ? session.customer : null,
+    paymentIntentId,
+    updatedAt: new Date().toISOString(),
+  };
+  const encoded = JSON.stringify(record);
+  await kv.put(`entitlement:session:${session.id}`, encoded);
+  if (email) await kv.put(`entitlement:email:${email}`, encoded);
+  if (paymentIntentId) await kv.put(`entitlement:pi:${paymentIntentId}`, encoded);
+}
+
+async function revokeByPaymentIntent(env, paymentIntentId) {
+  const kv = env.CAREPLAN_KV;
+  if (!kv || !paymentIntentId) return false;
+  const raw = await kv.get(`entitlement:pi:${paymentIntentId}`);
+  if (!raw) return false;
+  let record;
+  try { record = JSON.parse(raw); } catch { return false; }
+  record.paid = false;
+  record.refunded = true;
+  record.includeEmergencyCard = false;
+  record.updatedAt = new Date().toISOString();
+  const encoded = JSON.stringify(record);
+  await kv.put(`entitlement:pi:${paymentIntentId}`, encoded);
+  if (record.sessionId) await kv.put(`entitlement:session:${record.sessionId}`, encoded);
+  if (record.email) await kv.put(`entitlement:email:${record.email}`, encoded);
+  return true;
+}
+
+/** Sends the access email at most once, and only when KV can remember that it was sent. */
+async function fulfilOnce(env, session) {
+  const email = sessionEmail(session);
+  if (!isPaidVaultSession(session) || !email || !env.BREVO_API_KEY || !env.CAREPLAN_KV) return false;
+  const key = `sent:${session.id}`;
+  if (await env.CAREPLAN_KV.get(key)) return false;
+  await sendVaultEmail(env, email, session.id, 'Your Care Vault is ready');
+  await env.CAREPLAN_KV.put(key, new Date().toISOString());
+  return true;
+}
+
 /* ------------------------------------------------------------ payment routes */
 
 async function createPayment(request, env) {
+  const limited = await rateLimit(request, env, 'create-payment', 20);
+  if (limited) return limited;
   if (!env.STRIPE_SECRET_KEY || env.CHECKOUT_VIA_LINKS === '1') {
     return json(request, { error: 'Checkout sessions are not enabled; use the payment link' }, 503);
   }
@@ -255,13 +392,14 @@ async function createPayment(request, env) {
 
   const fields = {
     mode: 'payment',
+    customer_creation: 'always',
     'line_items[0][price]': PREMIUM_PRICE_ID,
     'line_items[0][quantity]': '1',
     success_url: `${origin}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/?checkout=cancelled`,
     'metadata[product]': 'frenchie-care-vault',
     'payment_intent_data[metadata][product]': 'frenchie-care-vault',
-    'payment_intent_data[description]': 'Frenchie Care Vault',
+    'payment_intent_data[description]': 'Frenchie Care Vault by FrenchyFab',
   };
   if (isValidEmail(email)) fields.customer_email = email;
   if (answers) fields['metadata[answers]'] = JSON.stringify(answers);
@@ -280,7 +418,9 @@ async function createPayment(request, env) {
   }
 }
 
-async function verifyPayment(request, env, ctx) {
+async function verifyPayment(request, env) {
+  const limited = await rateLimit(request, env, 'verify-payment', 30);
+  if (limited) return limited;
   if (!env.STRIPE_SECRET_KEY) return json(request, { error: 'Payment service is not configured' }, 503);
   const body = await readJson(request);
   const sessionId = typeof body?.sessionId === 'string' ? body.sessionId : '';
@@ -292,7 +432,6 @@ async function verifyPayment(request, env, ctx) {
   try {
     session = await retrieveSession(env, sessionId);
   } catch (error) {
-    // Stripe says no such session: a definite "not paid", not an outage.
     if (error.status === 404) return json(request, { paid: false, refunded: false, sessionId, error: 'Unknown session' });
     console.error('verify-payment', error.message);
     return json(request, { error: 'Unable to reach Stripe' }, 502);
@@ -301,17 +440,14 @@ async function verifyPayment(request, env, ctx) {
   const priceIds = sessionPriceIds(session);
   const paid = isPaidVaultSession(session);
   const email = sessionEmail(session);
+  await rememberEntitlement(env, session);
 
-  // Fulfilment email: only when the success page asks (fulfil: true), and once per session.
-  if (paid && email && body?.fulfil === true && env.BREVO_API_KEY && await firstTime(env, `sent:${session.id}`, 0, false)) {
-    const work = (async () => {
-      try {
-        await sendVaultEmail(env, email, session.id, 'Your Care Vault is ready');
-      } catch (error) {
-        console.error('fulfilment email', error.message);
-      }
-    })();
-    if (ctx?.waitUntil) ctx.waitUntil(work); else await work;
+  if (paid && email && body?.fulfil === true) {
+    try {
+      await fulfilOnce(env, session);
+    } catch (error) {
+      console.error('fulfilment email', error.message);
+    }
   }
 
   return json(request, {
@@ -324,7 +460,135 @@ async function verifyPayment(request, env, ctx) {
   });
 }
 
+async function handleStripeWebhook(request, env) {
+  if (!env.STRIPE_WEBHOOK_SECRET || !env.STRIPE_SECRET_KEY) {
+    return json(request, { error: 'Webhook is not configured' }, 503);
+  }
+  const rawBody = await request.text();
+  if (rawBody.length > 100000) return json(request, { error: 'Payload too large' }, 413);
+  const sigHeader = request.headers.get('stripe-signature') || '';
+  const valid = await verifyStripeSignature(rawBody, sigHeader, env.STRIPE_WEBHOOK_SECRET);
+  if (!valid) {
+    return json(request, { error: 'Invalid Stripe signature' }, 400);
+  }
+
+  let event;
+  try {
+    event = JSON.parse(rawBody);
+  } catch {
+    return json(request, { error: 'Malformed webhook payload' }, 400);
+  }
+
+  if (event?.type === 'charge.refunded' || event?.type === 'charge.dispute.created') {
+    const pi = event?.data?.object?.payment_intent;
+    const piId = typeof pi === 'string' ? pi : pi?.id;
+    const revoked = await revokeByPaymentIntent(env, piId);
+    return json(request, { received: true, revoked });
+  }
+
+  // This product is a one-time purchase. Subscription events are acknowledged and ignored.
+  if (event?.type === 'customer.subscription.deleted' || event?.type === 'customer.subscription.updated') {
+    return json(request, { received: true, ignored: true, reason: 'one-time-purchase' });
+  }
+
+  if (event?.type !== 'checkout.session.completed') {
+    return json(request, { received: true, ignored: true });
+  }
+
+  const sessionId = typeof event?.data?.object?.id === 'string' ? event.data.object.id : '';
+  if (!/^cs_(live|test)_[A-Za-z0-9]{10,250}$/.test(sessionId)) {
+    return json(request, { received: true, ignored: true });
+  }
+
+  try {
+    const session = await retrieveSession(env, sessionId);
+    await rememberEntitlement(env, session);
+    if (isPaidVaultSession(session)) {
+      try {
+        await fulfilOnce(env, session);
+      } catch (error) {
+        console.error('webhook fulfilment email', error.message);
+        return json(request, { error: 'Fulfilment email failed' }, 502);
+      }
+    }
+    return json(request, { received: true, fulfilled: isPaidVaultSession(session) });
+  } catch (error) {
+    console.error('stripe-webhook', error.message);
+    return json(request, { error: 'Unable to process webhook' }, 502);
+  }
+}
+
+async function vaultContent(request, env) {
+  const limited = await rateLimit(request, env, 'vault-content', 30);
+  if (limited) return limited;
+  if (!env.STRIPE_SECRET_KEY) return json(request, { error: 'Payment service is not configured' }, 503);
+  const body = await readJson(request);
+  let sessionId = typeof body?.sessionId === 'string' ? body.sessionId : '';
+  if (!sessionId) {
+    const auth = await readAuthSession(request, env);
+    if (auth?.email && env.CAREPLAN_KV) {
+      const raw = await env.CAREPLAN_KV.get(`entitlement:email:${auth.email}`);
+      try {
+        const record = raw ? JSON.parse(raw) : null;
+        if (record?.paid && !record.refunded && typeof record.sessionId === 'string') sessionId = record.sessionId;
+      } catch { /* ignore */ }
+    }
+  }
+  if (!/^cs_(live|test)_[A-Za-z0-9]{10,250}$/.test(sessionId)) {
+    return json(request, { error: 'Vault is locked' }, 403);
+  }
+  let session;
+  try {
+    session = await retrieveSession(env, sessionId);
+  } catch (error) {
+    if (error.status === 404) return json(request, { error: 'Vault is locked' }, 403);
+    return json(request, { error: 'Unable to reach Stripe' }, 502);
+  }
+  if (!isPaidVaultSession(session)) return json(request, { error: 'Vault is locked' }, 403);
+  await rememberEntitlement(env, session);
+  const answers = sessionAnswers(session) || parseAnswers(body?.answers);
+  if (!answers) return json(request, { error: 'Quiz answers are missing. Retake the quiz on this device.' }, 409);
+  return json(request, { pack: buildVaultPack(answers) });
+}
+
+async function billingPortal(request, env) {
+  const limited = await rateLimit(request, env, 'billing-portal', 10);
+  if (limited) return limited;
+  if (!env.STRIPE_SECRET_KEY) return json(request, { error: 'Payment service is not configured' }, 503);
+  const body = await readJson(request);
+  const sessionId = typeof body?.sessionId === 'string' ? body.sessionId : '';
+  if (!/^cs_(live|test)_[A-Za-z0-9]{10,250}$/.test(sessionId)) {
+    return json(request, { error: 'Invalid checkout session' }, 400);
+  }
+  let session;
+  try {
+    session = await retrieveSession(env, sessionId);
+  } catch (error) {
+    if (error.status === 404) return json(request, { error: 'Unknown session' }, 404);
+    return json(request, { error: 'Unable to reach Stripe' }, 502);
+  }
+  const customer = typeof session.customer === 'string' ? session.customer : null;
+  if (!customer) {
+    return json(request, {
+      error: 'This checkout has no Stripe customer on file. Use the receipt email, or write to info@frenchyfab.com, to ask about a refund.',
+    }, 409);
+  }
+  try {
+    const portal = await stripe(env, '/billing_portal/sessions', {
+      method: 'POST',
+      body: formBody({ customer, return_url: `${allowedOrigin(request)}/` }),
+    });
+    if (!portal.url) return json(request, { error: 'Stripe did not return a portal URL' }, 502);
+    return json(request, { url: portal.url });
+  } catch (error) {
+    console.error('billing-portal', error.message);
+    return json(request, { error: 'The billing portal is not available. Email info@frenchyfab.com for a receipt or refund.' }, 502);
+  }
+}
+
 async function restorePurchase(request, env) {
+  const limited = await rateLimit(request, env, 'restore-purchase', 8);
+  if (limited) return limited;
   if (!env.STRIPE_SECRET_KEY || !env.BREVO_API_KEY) {
     return json(request, { error: 'Purchase recovery is not configured' }, 503);
   }
@@ -333,7 +597,6 @@ async function restorePurchase(request, env) {
   if (!isValidEmail(email)) return json(request, { error: 'A valid email is required' }, 400);
 
   try {
-    // customer_details[email] also finds guest checkouts from Payment Links (no Customer object).
     const list = await stripe(env, `/checkout/sessions?limit=20&status=complete&customer_details[email]=${encodeURIComponent(email)}`);
     for (const candidate of list.data || []) {
       if (candidate.payment_status !== 'paid') continue;
@@ -354,55 +617,106 @@ async function restorePurchase(request, env) {
 
 /* --------------------------------------------------------------- lead routes */
 
-async function handleLeadCapture(request, env, ctx) {
+function handleHealth(request, env) {
+  return json(request, {
+    ok: true,
+    worker: WORKER_VERSION,
+    stripeConfigured: Boolean(env.STRIPE_SECRET_KEY),
+    webhookConfigured: Boolean(env.STRIPE_WEBHOOK_SECRET),
+    brevoConfigured: Boolean(env.BREVO_API_KEY),
+    kvBound: Boolean(env.CAREPLAN_KV),
+    checkoutMode: env.CHECKOUT_VIA_LINKS === '1' ? 'payment-links' : 'checkout-sessions',
+  });
+}
+
+/** Positive integer from BREVO_LIST_ID. Unset means list 8, the current dashboard value. */
+export function brevoListId(env) {
+  const raw = env.BREVO_LIST_ID == null || String(env.BREVO_LIST_ID).trim() === '' ? '8' : String(env.BREVO_LIST_ID).trim();
+  const id = Number(raw);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+async function brevoErrorText(res) {
+  const detail = await res.text().catch(() => '');
+  return detail.slice(0, 300);
+}
+
+async function brevoUpsertContact(env, email, answers, listId) {
+  const baseAttrs = { SOURCE: 'frenchie-care-app', LAST_CARE_OPTIN_AT: new Date().toISOString() };
+  const attributes = { ...baseAttrs };
+  if (answers) {
+    attributes.FRENCHIE_STAGE = answers.lifeStage;
+    attributes.FRENCHIE_CONCERN = answers.concern;
+  }
+  const send = (attrs) => fetch('https://api.brevo.com/v3/contacts', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'api-key': env.BREVO_API_KEY },
+    body: JSON.stringify({ email, attributes: attrs, listIds: [listId], updateEnabled: true }),
+  });
+
+  let res = await send(attributes);
+  if (!(res.ok || res.status === 204) && answers) {
+    console.error('brevo contact rejected', res.status, 'list', listId, await brevoErrorText(res));
+    res = await send(baseAttrs);
+  }
+  if (!(res.ok || res.status === 204)) {
+    console.error('brevo contact failed', res.status, 'list', listId, await brevoErrorText(res));
+    return false;
+  }
+  return true;
+}
+
+async function handleLeadCapture(request, env) {
+  const limited = await rateLimit(request, env, 'lead', 12);
+  if (limited) return limited;
   const payload = (await readJson(request)) || {};
   const email = normalizeEmail(payload.email);
   if (!isValidEmail(email)) return json(request, { success: false, message: 'A valid email is required.' }, 400);
   const answers = parseAnswers(payload.answers);
 
-  const mirror = fetch(`${LEAD_STORE}/rest/v1/email_subscribers`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email, name: '', source: payload.source || 'frenchie-care-compass', quiz: answers }),
-  }).catch(() => {});
-  if (ctx?.waitUntil) ctx.waitUntil(mirror);
+  let stored = false;
+  try {
+    const mirror = await fetch(`${LEAD_STORE}/rest/v1/email_subscribers`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, name: '', source: payload.source || 'frenchie-care-compass', quiz: answers }),
+    });
+    stored = mirror.ok;
+    if (!mirror.ok) console.error('lead store failed', mirror.status);
+  } catch (error) {
+    console.error('lead store', error.message);
+  }
+
+  if (!env.BREVO_API_KEY) {
+    console.error('brevo contact skipped: BREVO_API_KEY is not set');
+    return json(request, { success: false, message: 'Email capture is not configured. Your plan stays on this device.', stored }, 503);
+  }
+  const listId = brevoListId(env);
+  if (!listId) {
+    console.error('brevo contact skipped: BREVO_LIST_ID is not a positive integer');
+    return json(request, { success: false, message: 'Email capture is not configured. Your plan stays on this device.', stored }, 503);
+  }
 
   let brevo = false;
-  if (env.BREVO_API_KEY) {
-    try {
-      const attrs = { SOURCE: 'frenchie-care-app', LAST_CARE_OPTIN_AT: new Date().toISOString() };
-      if (answers) {
-        attrs.FRENCHIE_STAGE = answers.lifeStage;
-        attrs.FRENCHIE_CONCERN = answers.concern;
-      }
-      const res = await fetch('https://api.brevo.com/v3/contacts', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'api-key': env.BREVO_API_KEY },
-        body: JSON.stringify({ email, attributes: attrs, listIds: [Number(env.BREVO_LIST_ID || 8)], updateEnabled: true }),
-      });
-      brevo = res.ok || res.status === 204;
-      if (!brevo && answers) {
-        // Unknown custom attributes make Brevo reject the whole call. Retry with the base set.
-        const retry = await fetch('https://api.brevo.com/v3/contacts', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', 'api-key': env.BREVO_API_KEY },
-          body: JSON.stringify({ email, attributes: { SOURCE: attrs.SOURCE, LAST_CARE_OPTIN_AT: attrs.LAST_CARE_OPTIN_AT }, listIds: [Number(env.BREVO_LIST_ID || 8)], updateEnabled: true }),
-        });
-        brevo = retry.ok || retry.status === 204;
-      }
-    } catch (error) {
-      console.error('brevo contact', error.message);
-    }
+  try {
+    brevo = await brevoUpsertContact(env, email, answers, listId);
+  } catch (error) {
+    console.error('brevo contact', error.message);
   }
-  return json(request, { success: true, id: `cf_${Date.now().toString(36)}`, brevo });
+  if (!brevo) {
+    return json(request, { success: false, message: 'We could not save your email. Your plan stays on this device.', brevo: false, stored }, 502);
+  }
+  return json(request, { success: true, id: `cf_${Date.now().toString(36)}`, brevo: true, stored });
 }
 
 async function proxyWp(request, url) {
+  if (!['GET', 'POST', 'HEAD'].includes(request.method)) return json(request, { error: 'Method not allowed' }, 405);
   const suffix = url.pathname.replace('/api/ffab-care/v1', '');
   const headers = new Headers(request.headers);
   headers.delete('origin');
   headers.delete('referer');
   headers.delete('cookie');
+  headers.delete('authorization');
   const res = await fetch(WP_ENDPOINT + suffix + url.search, {
     method: request.method,
     headers,
@@ -416,18 +730,14 @@ async function proxyWp(request, url) {
 
 /* ------------------------------------------------------------ static site */
 
-/** Only needed while an old Lovable-era bundle is still published. Harmless afterwards. */
+/** Rewrites leftovers from older Lovable/Supabase bundles. Harmless on the current build. */
 function rewriteLegacy(body) {
-  let out = body
+  return body
     .replaceAll(WP_ENDPOINT, `${PUBLIC_ORIGIN}/api/ffab-care/v1`)
-    .replaceAll(LEGACY_LOVABLE, PUBLIC_ORIGIN)
+    .replaceAll('https://frenchie-care-compass.lovable.app', PUBLIC_ORIGIN)
     .replaceAll('frenchie-care-compass.lovable.app', 'care-plan.frenchyfab.com')
-    .replaceAll(LEGACY_SUPABASE, PUBLIC_ORIGIN)
+    .replaceAll('https://zyxsijqazzhuudhmfitw.supabase.co', PUBLIC_ORIGIN)
     .replace(/<script[^>]+src=["']\/~flock\.js["'][^>]*><\/script>/gi, '');
-  if (body.includes('<html')) {
-    out = out.replace(/<link\s+rel=["']canonical["'][^>]*>/i, `<link rel="canonical" href="${PUBLIC_ORIGIN}/" />`);
-  }
-  return out;
 }
 
 async function serveStatic(request, url) {
@@ -436,19 +746,20 @@ async function serveStatic(request, url) {
   headers0.delete('host');
   headers0.delete('cookie');
   let res = await fetch(`${STATIC_ORIGIN}${url.pathname}${url.search}`, { method, headers: headers0, redirect: 'follow' });
-  // Hosts that answer unknown paths with the SPA shell return HTML here, not a 404.
-  if (url.pathname === '/og-image.png' && !(res.ok && (res.headers.get('content-type') || '').startsWith('image/'))) {
-    res = await fetch(LEGACY_PREVIEW_IMAGE);
-  }
+
   // SPA routes such as /payment-success: serve the app shell instead of the host's 404.
   if (res.status === 404 && method === 'GET' && !/\.[a-z0-9]{2,5}$/i.test(url.pathname)) {
     const shell = await fetch(`${STATIC_ORIGIN}/index.html`);
     if (shell.ok) res = new Response(shell.body, { status: 200, headers: shell.headers });
   }
+
   const headers = new Headers(res.headers);
-  headers.set('x-careplan-edge', 'worker-2026-11-10');
+  headers.set('x-careplan-edge', WORKER_VERSION);
   headers.set('x-content-type-options', 'nosniff');
+  headers.set('x-frame-options', 'DENY');
   headers.set('referrer-policy', 'strict-origin-when-cross-origin');
+  headers.set('permissions-policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  headers.set('strict-transport-security', 'max-age=31536000; includeSubDomains; preload');
   headers.delete('x-robots-tag');
   if (url.pathname.startsWith('/payment-success')) headers.set('x-robots-tag', 'noindex');
 
@@ -456,7 +767,10 @@ async function serveStatic(request, url) {
   if (ct.includes('text/html') || ct.includes('javascript')) {
     const text = rewriteLegacy(await res.text());
     headers.delete('content-length');
-    if (ct.includes('text/html')) headers.set('cache-control', 'public, max-age=300, must-revalidate');
+    if (ct.includes('text/html')) {
+      headers.set('content-security-policy', SECURITY_CSP);
+      headers.set('cache-control', 'public, max-age=300, must-revalidate');
+    }
     return new Response(request.method === 'HEAD' ? null : text, { status: res.status, headers });
   }
   return new Response(request.method === 'HEAD' ? null : res.body, { status: res.status, headers });
@@ -469,21 +783,26 @@ export default {
     const url = new URL(request.url);
     if (url.hostname !== 'care-plan.frenchyfab.com') return fetch(request);
 
-    const isApi = url.pathname.startsWith('/functions/v1/') || url.pathname.startsWith('/api/') || url.pathname.startsWith('/rest/v1/');
+    const isApi = url.pathname.startsWith('/functions/v1/') || url.pathname.startsWith('/api/');
     if (isApi && request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(request) });
+
+    if (url.pathname.startsWith('/functions/v1/auth/')) return routeAuth(request, env, url.pathname, json);
 
     switch (url.pathname) {
       case '/functions/v1/create-payment':
         return request.method === 'POST' ? createPayment(request, env) : json(request, { error: 'Method not allowed' }, 405);
       case '/functions/v1/verify-payment':
-        return request.method === 'POST' ? verifyPayment(request, env, ctx) : json(request, { error: 'Method not allowed' }, 405);
+        return request.method === 'POST' ? verifyPayment(request, env) : json(request, { error: 'Method not allowed' }, 405);
       case '/functions/v1/restore-purchase':
         return request.method === 'POST' ? restorePurchase(request, env) : json(request, { error: 'Method not allowed' }, 405);
-      case '/functions/v1/generate-plan':
-        // The plan is built in the browser. Old bundles still call this; answer instantly.
-        return json(request, { sections: null, fallback: true });
-      case '/functions/v1/send-welcome-email':
-        return json(request, { ok: true });
+      case '/functions/v1/stripe-webhook':
+        return request.method === 'POST' ? handleStripeWebhook(request, env) : json(request, { error: 'Method not allowed' }, 405);
+      case '/functions/v1/vault-content':
+        return request.method === 'POST' ? vaultContent(request, env) : json(request, { error: 'Method not allowed' }, 405);
+      case '/functions/v1/billing-portal':
+        return request.method === 'POST' ? billingPortal(request, env) : json(request, { error: 'Method not allowed' }, 405);
+      case '/api/ffab-care/v1/health':
+        return request.method === 'GET' ? handleHealth(request, env) : json(request, { error: 'Method not allowed' }, 405);
       case '/api/ffab-care/v1/lead':
       case '/api/ffab-care/v1/email':
         return request.method === 'POST' ? handleLeadCapture(request, env, ctx) : json(request, { error: 'Method not allowed' }, 405);
@@ -491,10 +810,6 @@ export default {
         break;
     }
     if (url.pathname.startsWith('/api/ffab-care/v1')) return proxyWp(request, url);
-    if (url.pathname.startsWith('/rest/v1/')) {
-      // Legacy Supabase table calls from the 2026-06 bundle. Accept and ignore.
-      return json(request, []);
-    }
     if (url.pathname.startsWith('/functions/v1/')) return json(request, { error: 'Not found' }, 404);
     return serveStatic(request, url);
   },

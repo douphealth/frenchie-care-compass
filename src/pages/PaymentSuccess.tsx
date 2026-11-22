@@ -1,34 +1,38 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Download, Loader2, Mail } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Download, Loader2, Mail, Receipt } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { requestPurchaseRecovery, verifyCheckout } from '@/lib/revenueBackend';
+import { fetchVaultPack, openBillingPortal, requestPurchaseRecovery, verifyCheckout } from '@/lib/revenueBackend';
 import { saveProfile, loadProfile } from '@/lib/profileStore';
 import { canAccessPremium } from '@/lib/entitlement';
 import { generatePDF } from '@/lib/pdfGenerator';
 import { isValidEmail, normalizeEmail } from '@/lib/quizValidation';
 import { generatePlan } from '@/lib/planGenerator';
+import { toast } from '@/hooks/use-toast';
 
 type Status = 'checking' | 'unlocked' | 'unconfirmed' | 'missing' | 'error';
 
 const PaymentSuccess = () => {
   const navigate = useNavigate();
   const [status, setStatus] = useState<Status>('checking');
+  const [hasProfile, setHasProfile] = useState(false);
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [recoveryMessage, setRecoveryMessage] = useState('');
   const [downloading, setDownloading] = useState(false);
+  const [sessionId, setSessionId] = useState('');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const sessionId = params.get('session_id') || '';
+    const sessionFromUrl = params.get('session_id') || '';
+    setSessionId(sessionFromUrl);
     const viaEmail = params.get('via') === 'email';
-    if (!sessionId) {
+    if (!sessionFromUrl) {
       setStatus('missing');
       return;
     }
     let cancelled = false;
-    verifyCheckout(sessionId, { fulfil: !viaEmail })
+    verifyCheckout(sessionFromUrl, { fulfil: !viaEmail })
       .then((verified) => {
         if (cancelled) return;
         if (verified && canAccessPremium(verified.entitlement)) {
@@ -36,23 +40,35 @@ const PaymentSuccess = () => {
           const stored = loadProfile();
           // Opened on another device (or storage was cleared): rebuild the plan from the answers on the Stripe session.
           const useAnswers = stored.answers && stored.plan ? stored.answers : answers;
+          const resolvedPlan = useAnswers ? (stored.plan && stored.answers ? stored.plan : generatePlan(useAnswers)) : undefined;
           saveProfile({
             entitlement,
             email: entitlement.email || stored.email,
             leadCaptured: true,
-            ...(useAnswers ? { answers: useAnswers, plan: stored.plan && stored.answers ? stored.plan : generatePlan(useAnswers) } : {}),
+            ...(useAnswers && resolvedPlan ? { answers: useAnswers, plan: resolvedPlan } : {}),
           });
+          setHasProfile(Boolean(useAnswers && resolvedPlan));
           setStatus('unlocked');
         } else {
           setStatus('unconfirmed');
         }
       })
       .catch(() => {
-        // Network or server trouble is not the same as "not paid". Say so.
         if (!cancelled) setStatus('error');
       });
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    const titles: Record<Status, string> = {
+      checking: 'Checking payment | FrenchyFab Care Compass',
+      unlocked: 'Vault unlocked | FrenchyFab Care Compass',
+      unconfirmed: 'Payment not confirmed | FrenchyFab Care Compass',
+      missing: 'Payment not confirmed | FrenchyFab Care Compass',
+      error: 'Payment check unavailable | FrenchyFab Care Compass',
+    };
+    document.title = titles[status];
+  }, [status]);
 
   const downloadVault = async () => {
     const stored = loadProfile();
@@ -61,14 +77,34 @@ const PaymentSuccess = () => {
       return;
     }
     if (!stored.plan || !stored.answers) {
-      setRecoveryMessage('Payment confirmed, but this browser has no Frenchie profile yet. Take the 5-question quiz once and the vault opens with your answers.');
+      setRecoveryMessage('Payment confirmed, but this browser has no Frenchie profile yet. Take the 5-question quiz once and your unlocked vault opens immediately.');
       return;
     }
     setDownloading(true);
     try {
+      let program = null;
+      try {
+        program = (await fetchVaultPack(stored.entitlement.sessionId, stored.answers)).program;
+      } catch (error) {
+        console.error('Vault program fetch failed:', error);
+      }
       await generatePDF(stored.plan, stored.answers, {
         tier: 'premium',
         includeEmergencyCard: stored.entitlement.includeEmergencyCard,
+        program,
+      });
+      toast({
+        title: 'Vault PDF downloaded',
+        description: program
+          ? 'Check your downloads folder for your complete Frenchie Care Vault PDF.'
+          : 'The PDF downloaded without the 4-week program page because the server did not return it.',
+      });
+    } catch (error) {
+      console.error('Vault PDF download failed:', error);
+      toast({
+        title: 'Download failed',
+        description: 'Please try again or open your vault on screen to print.',
+        variant: 'destructive',
       });
     } finally {
       setDownloading(false);
@@ -93,15 +129,17 @@ const PaymentSuccess = () => {
   return (
     <div className="min-h-screen px-5 py-12 max-w-lg mx-auto flex flex-col items-center justify-center text-center">
       <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-        className="w-20 h-20 rounded-full bg-success/20 flex items-center justify-center mb-6"
+        className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 ${status === 'unlocked' || status === 'checking' ? 'bg-success/20' : 'bg-destructive/10'}`}
       >
         {status === 'checking' ? (
           <Loader2 className="w-10 h-10 text-success animate-spin" />
-        ) : (
+        ) : status === 'unlocked' ? (
           <CheckCircle2 className="w-10 h-10 text-success" />
+        ) : (
+          <AlertCircle className="w-10 h-10 text-destructive" />
         )}
       </motion.div>
 
@@ -110,7 +148,9 @@ const PaymentSuccess = () => {
           {status === 'unlocked' ? 'Vault unlocked' : status === 'checking' ? 'Checking payment' : status === 'error' ? 'Payment check unavailable' : 'Payment not confirmed'}
         </h1>
         <p className="text-muted-foreground text-sm max-w-sm mx-auto">
-          {status === 'unlocked' && 'Stripe confirmed this purchase. Download the vault PDF, or open your plan to see the premium modules.'}
+          {status === 'unlocked' && (hasProfile
+            ? 'Stripe confirmed this purchase. Download the vault PDF, or open your plan to see the premium modules.'
+            : 'Stripe confirmed this purchase and saved your access on this browser. Take the 5-question quiz once to personalize your Vault PDF.')}
           {status === 'checking' && 'We are asking Stripe whether this checkout was paid. The vault stays locked until that check succeeds.'}
           {status === 'missing' && 'This page does not unlock anything by itself. Finish checkout, or use the recovery form with the email on your Stripe receipt.'}
           {status === 'unconfirmed' && 'Stripe did not confirm a paid session for this link. You have not been charged by this page, and the vault stays locked.'}
@@ -119,19 +159,42 @@ const PaymentSuccess = () => {
       </div>
 
       <div className="mt-8 space-y-3 w-full max-w-xs">
-        {status === 'unlocked' && (
+        {status === 'unlocked' && hasProfile && (
           <Button onClick={downloadVault} disabled={downloading} size="lg" className="w-full h-12 rounded-xl font-bold gap-2">
             {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            Download vault PDF
+            {downloading ? 'Building Vault PDF...' : 'Download vault PDF'}
           </Button>
         )}
-        <Button onClick={() => navigate('/')} variant={status === 'unlocked' ? 'outline' : 'default'} size="lg" className="w-full h-12 rounded-xl font-bold">
-          {status === 'unlocked' ? 'Open my vault on screen' : 'Back to care plan'}
+        <Button onClick={() => navigate('/')} variant={status === 'unlocked' && hasProfile ? 'outline' : 'default'} size="lg" className="w-full h-12 rounded-xl font-bold">
+          {status === 'unlocked'
+            ? (hasProfile ? 'Open my vault on screen' : 'Take 60-second quiz to personalize vault')
+            : 'Back to care plan'}
         </Button>
         {status === 'unlocked' && recoveryMessage && <p className="text-xs text-muted-foreground">{recoveryMessage}</p>}
+        {status === 'unlocked' && sessionId && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={async () => {
+              try {
+                window.location.href = await openBillingPortal(sessionId);
+              } catch (error) {
+                toast({
+                  title: 'Receipts unavailable',
+                  description: error instanceof Error ? error.message : 'Email info@frenchyfab.com for a receipt or refund.',
+                  variant: 'destructive',
+                });
+              }
+            }}
+            className="w-full h-11 rounded-xl font-bold gap-2"
+          >
+            <Receipt className="w-4 h-4" />
+            Receipt or refund
+          </Button>
+        )}
         {status === 'unlocked' && (
           <p className="text-xs text-muted-foreground">
-            Bookmark this page: the link reopens your vault on any device. We also email it to you.
+            This is a one-time purchase, not a subscription. Bookmark this page: the link reopens your vault on any device. We also email it to you.
           </p>
         )}
       </div>

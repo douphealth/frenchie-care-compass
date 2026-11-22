@@ -1,17 +1,33 @@
+# Existing worker. Deploy updates this script. Do not rename it: a new name creates a second worker.
 name = "frenchyfab-careplan-selfhosted-proxy"
 main = "careplan-proxy.js"
 compatibility_date = "2026-09-01"
+account_id = "5dc0401c38d9de0c6947fee40a210937"
 
+# Dashboard routes today: the wildcard, the bare host, and the slash path.
+# Keep all three. Dropping the bare host would let that request skip the worker
+# and follow DNS to the gearup-flow-master Pages alias.
 routes = [
+  { pattern = "care-plan.frenchyfab.com", zone_name = "frenchyfab.com" },
+  { pattern = "care-plan.frenchyfab.com/", zone_name = "frenchyfab.com" },
   { pattern = "care-plan.frenchyfab.com/*", zone_name = "frenchyfab.com" },
 ]
 
-# Secrets (set once, never commit values):
-#   npx wrangler secret put STRIPE_SECRET_KEY   # restricted key; Checkout Sessions read is the minimum
-#   npx wrangler secret put BREVO_API_KEY
+# Secrets (Wrangler CLI only, never commit values):
+#   npx wrangler secret put STRIPE_SECRET_KEY      # already set on the live worker
+#   npx wrangler secret put STRIPE_WEBHOOK_SECRET  # not set yet
+#   npx wrangler secret put BREVO_API_KEY          # live value is a plain-text var; move it to a secret
+# Do not put BREVO_API_KEY under [vars].
+
+# Created in account 5dc0401c38d9de0c6947fee40a210937. Same account as this worker.
+[[kv_namespaces]]
+binding = "CAREPLAN_KV"
+id = "c19be13a9f5c41e3b4dfad50d0e26efd"
+
 [vars]
+# Live dashboard value. Change this before deploy if opt-ins should go to a new Brevo list.
 BREVO_LIST_ID = "8"
 MAIL_FROM = "info@frenchyfab.com"
-# The current Stripe key cannot create Checkout Sessions, so checkout uses the Payment Links.
-# Remove this once the key has Checkout Sessions: write.
-CHECKOUT_VIA_LINKS = "1"
+# Live dashboard is "1" (Payment Links). Deploying this file sets "0" (Checkout Sessions).
+# The app falls back to the Payment Link if Stripe rejects session creation.
+CHECKOUT_VIA_LINKS = "0"

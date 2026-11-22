@@ -1,0 +1,13 @@
+{
+  "name": "FrenchyFab Care Compass",
+  "short_name": "Care Compass",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#faf7ef",
+  "theme_color": "#2f5d3a",
+  "icons": [
+    { "src": "/favicon.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

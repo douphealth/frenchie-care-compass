@@ -10,6 +10,22 @@ export type AffiliateProduct = {
   warning?: boolean;
 };
 
+const DEFAULT_AMAZON_TAG = (import.meta.env.VITE_AMAZON_TAG as string | undefined)?.trim() || '';
+
+/** Appends an Amazon Associates `tag=` parameter to Amazon URLs when configured. */
+export function withAmazonTag(rawUrl: string, tag: string = DEFAULT_AMAZON_TAG): string {
+  const cleanTag = tag.trim();
+  if (!cleanTag) return rawUrl;
+  try {
+    const parsed = new URL(rawUrl);
+    if (!/(^|\.)amazon\.com$/i.test(parsed.hostname)) return rawUrl;
+    parsed.searchParams.set('tag', cleanTag);
+    return parsed.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
 const CATALOG: Record<string, AffiliateProduct> = {
   slowFeeder: {
     id: 'slow-feeder',
@@ -62,7 +78,7 @@ const CATALOG: Record<string, AffiliateProduct> = {
   },
 };
 
-export function pickProducts(answers: QuizAnswers): AffiliateProduct[] {
+export function pickProducts(answers: QuizAnswers, amazonTag: string = DEFAULT_AMAZON_TAG): AffiliateProduct[] {
   const out: AffiliateProduct[] = [];
 
   if (answers.concern === 'diet' || answers.concern === 'breathing') {
@@ -86,9 +102,11 @@ export function pickProducts(answers: QuizAnswers): AffiliateProduct[] {
     out.push(CATALOG.yHarness1, CATALOG.slowFeeder);
   }
 
-  // De-dupe
+  // De-dupe and apply configured Amazon Associates tag
   const seen = new Set<string>();
-  return out.filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
+  return out
+    .filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)))
+    .map((p) => ({ ...p, url: withAmazonTag(p.url, amazonTag) }));
 }
 
 export const TELEHEALTH_URL =

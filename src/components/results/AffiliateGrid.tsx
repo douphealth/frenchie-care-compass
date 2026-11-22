@@ -24,11 +24,11 @@ const AffiliateGrid = ({ answers }: { answers: QuizAnswers }) => {
             key={p.id}
             href={p.url}
             target="_blank"
-            rel="noopener noreferrer sponsored"
+            rel={p.warning ? 'noopener noreferrer' : 'noopener noreferrer sponsored'}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-            className={`group rounded-xl border-2 p-4 bg-card hover:shadow-md transition-all ${
+            transition={{ delay: i * 0.04 }}
+            className={`group rounded-xl border-2 p-4 bg-card hover:shadow-md transition-all flex flex-col justify-between ${
               p.warning ? 'border-destructive/50 bg-destructive/5' : 'border-border hover:border-primary/40'
             }`}
           >
@@ -46,11 +46,16 @@ const AffiliateGrid = ({ answers }: { answers: QuizAnswers }) => {
                   {p.badge}
                 </div>
                 <div className="font-bold text-sm text-foreground leading-tight mb-1 flex items-center gap-1">
-                  {p.title}
-                  <ExternalLink className="w-3 h-3 text-muted-foreground group-hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <span>{p.title}</span>
                 </div>
                 <p className="text-xs text-muted-foreground leading-snug">{p.why}</p>
               </div>
+            </div>
+            <div className={`mt-3 pt-2.5 border-t flex items-center justify-between text-xs font-bold ${
+              p.warning ? 'border-destructive/20 text-destructive' : 'border-border/60 text-primary'
+            }`}>
+              <span>{p.warning ? 'Read AKC safety guide' : 'View on Amazon'}</span>
+              <ExternalLink className="w-3.5 h-3.5 opacity-80 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
             </div>
           </motion.a>
         ))}

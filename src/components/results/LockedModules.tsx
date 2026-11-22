@@ -1,13 +1,15 @@
 import { motion } from 'framer-motion';
 import { Lock, Calendar, Utensils, AlertTriangle, Stethoscope, Thermometer, CheckCircle2, Target } from 'lucide-react';
-import { QuizAnswers } from '@/lib/quizData';
-import { buildPremiumModules } from '@/lib/premiumContent';
-import { buildFocusProgram } from '@/lib/focusProgram';
+import type { FocusProgram } from '@/lib/focusProgram';
+import type { PremiumModule } from '@/lib/premiumContent';
 
 type Props = {
   onUpgrade: () => void;
   unlocked: boolean;
-  answers: QuizAnswers;
+  teaserTitle: string;
+  program?: FocusProgram | null;
+  modules?: PremiumModule[];
+  vaultState?: 'idle' | 'loading' | 'error';
 };
 
 const lockedItems = [
@@ -18,9 +20,7 @@ const lockedItems = [
   { icon: Thermometer, label: 'Heat and cold protocol' },
 ];
 
-const LockedModules = ({ onUpgrade, unlocked, answers }: Props) => {
-  const modules = unlocked ? buildPremiumModules(answers) : [];
-  const program = buildFocusProgram(answers);
+const LockedModules = ({ onUpgrade, unlocked, teaserTitle, program, modules = [], vaultState = 'idle' }: Props) => {
 
   return (
     <motion.div
@@ -31,6 +31,14 @@ const LockedModules = ({ onUpgrade, unlocked, answers }: Props) => {
     >
       {unlocked ? (
         <div className="space-y-3">
+          {vaultState === 'loading' && (
+            <p className="text-sm text-muted-foreground">Loading your Care Vault from the server…</p>
+          )}
+          {vaultState === 'error' && (
+            <p className="text-sm text-destructive">The vault could not be loaded. It stays locked until the server confirms this purchase.</p>
+          )}
+          {program && (
+          <>
           <div className="flex items-center gap-2 mb-1">
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span className="text-xs font-black text-emerald-700 uppercase tracking-wider">
@@ -63,6 +71,8 @@ const LockedModules = ({ onUpgrade, unlocked, answers }: Props) => {
               </ul>
             </div>
           </section>
+          </>
+          )}
           {modules.map((module) => (
             <section
               key={module.id}
@@ -96,8 +106,8 @@ const LockedModules = ({ onUpgrade, unlocked, answers }: Props) => {
               <Target className="w-4 h-4 text-amber-700" />
             </div>
             <span className="text-xs leading-snug">
-              <span className="block font-black text-foreground/80">{program.title}</span>
-              <span className="block text-foreground/60">Week-by-week steps for your main concern: {program.weeks.map((w) => w.title.toLowerCase()).join(' → ')}</span>
+              <span className="block font-black text-foreground/80">{teaserTitle}</span>
+              <span className="block text-foreground/60">Four guided weeks for your main concern, unlocked after Stripe confirms payment.</span>
             </span>
           </button>
           <div className="grid grid-cols-2 gap-2">

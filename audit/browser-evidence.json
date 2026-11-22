@@ -1,0 +1,104 @@
+{
+  "pages": [
+    {
+      "name": "desktop-landing",
+      "path": "/",
+      "status": 200,
+      "h1": [
+        "Get Your Frenchie's Personalized Care Plan in Under 2 Minutes"
+      ],
+      "overflow": 0,
+      "errors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "failed": [
+        "404 http://127.0.0.1:4173/api/ffab-care/v1/lead",
+        "404 http://127.0.0.1:4173/functions/v1/create-payment"
+      ]
+    },
+    {
+      "name": "mobile-landing",
+      "path": "/",
+      "status": 200,
+      "h1": [
+        "Get Your Frenchie's Personalized Care Plan in Under 2 Minutes"
+      ],
+      "overflow": 0,
+      "errors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "failed": [
+        "404 http://127.0.0.1:4173/api/ffab-care/v1/lead"
+      ]
+    },
+    {
+      "name": "payment-missing",
+      "path": "/payment-success",
+      "status": 200,
+      "h1": [
+        "Payment not confirmed"
+      ],
+      "overflow": 0,
+      "errors": [],
+      "failed": []
+    },
+    {
+      "name": "account",
+      "path": "/account",
+      "status": 200,
+      "h1": [
+        "Your account"
+      ],
+      "overflow": 0,
+      "errors": [],
+      "failed": []
+    },
+    {
+      "name": "not-found",
+      "path": "/does-not-exist",
+      "status": 200,
+      "h1": [
+        "Page not found"
+      ],
+      "overflow": 0,
+      "errors": [
+        "404 Error: User attempted to access non-existent route: /does-not-exist"
+      ],
+      "failed": []
+    }
+  ],
+  "flows": [
+    {
+      "name": "desktop-quiz",
+      "h1Results": 1,
+      "url": "http://127.0.0.1:4173/"
+    },
+    {
+      "name": "checkout-fallback",
+      "url": "https://buy.stripe.com/dRm14ncpW1qw3oh9f0ejK09?prefilled_email=audit-bot%40example.com"
+    },
+    {
+      "name": "mobile-results-overflow",
+      "mobileOverflow": 0
+    },
+    {
+      "name": "payment-missing-heading",
+      "payText": "Payment not confirmed"
+    },
+    {
+      "name": "account-h1",
+      "h1": "Your account"
+    },
+    {
+      "name": "not-found",
+      "h1": "Page not found"
+    },
+    {
+      "sitemapStatus": 200,
+      "sitemapType": "text/xml",
+      "sitemapStarts": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/sc",
+      "robotsHasSitemap": true
+    }
+  ]
+}
