@@ -22,6 +22,8 @@ Verified 2026-11-22 by SHA-256 of the entry JavaScript.
 
 `care-plan.frenchyfab.com` and `frenchie-care-compass.pages.dev` are the same build. They are not the snapshot build, and they are not `gearup-flow-master.pages.dev`.
 
+Owner-confirmed DNS, checked against the worker source: `care-plan.frenchyfab.com` is a proxied CNAME to `frenchie-care-compass.gearup-flow-master.pages.dev` (branch alias of Pages project `gearup-flow-master`, account `5dc0401c38d9de0c6947fee40a210937`). The worker does not fetch that alias. `STATIC_ORIGIN` is `https://frenchie-care-compass.pages.dev`, the Pages project `frenchie-care-compass` in account `284f1a03e12aa7416ab177db3f692c17`, which is the project GitHub builds from this repo. The worker route is why the custom domain matches that origin. Keep `STATIC_ORIGIN` on `frenchie-care-compass.pages.dev`.
+
 ## Snapshot changes
 
 The zip is newer than `main` for the files listed in the request. Adopted means the change is on this branch. Adjusted means the idea is kept and the implementation changed. Rejected means it is not on this branch.
@@ -59,7 +61,7 @@ Severity is the production impact before this branch. Status is this branch.
 | Medium | Payments | No way to open a receipt or request a refund in the product. | No billing-portal route on `main`. | Fixed as a one-time Customer Portal session. Needs the owner to enable the portal. There is no subscription to cancel. |
 | Medium | Security | Worker responses lacked CSP, `X-Frame-Options`, and HSTS. | Live response headers: `x-careplan-edge: worker-2026-11-10`, no CSP. | Fixed in the worker and `public/_headers`. |
 | Medium | Security | `/api/ffab-care/v1/*` proxied arbitrary methods and forwarded `Authorization` to WordPress. | Live health check returned a WordPress JSON 404. | Fixed: health is handled first; proxy strips `Authorization` and allows only GET, POST, HEAD. |
-| Medium | Leads | Lead capture reported success even when both Brevo and the lead store failed. | `handleLeadCapture` on `main` always returned `success: true` for a valid email. | Fixed. Both failing returns 502 so the browser keeps the lead and retries. |
+| Medium | Leads | Lead capture reported success even when Brevo rejected the contact. The live key is a plain-text worker var, list 8, and the Brevo account allowlists IPs, which blocks Workers. | Live route behavior described by the owner; code on `main` returned `success: true` after a valid email. | Fixed. A Brevo failure logs the status and list id and returns 502. `BREVO_LIST_ID` selects the list. The plain-text key still has to be moved to a secret, and IP allowlisting has to be turned off. See `LAUNCH_CHECKLIST.md`. |
 | Medium | SEO | `/sitemap.xml` was the SPA shell. `robots.txt` had no Sitemap line. | Live `sitemap.xml` `content-type: text/html`, body starts `<!doctype html>`. | Fixed. Local preview serves `text/xml`. |
 | Medium | A11y / SEO | Quiz and email gate had no `h1`. Landing contrast failed WCAG AA for small text. | Live quiz question is an `h2` (repo before this branch). Lighthouse on the first local build: contrast 4.31, 4.02, and 3.07. | Fixed. Second Lighthouse run: accessibility 100, contrast score 1. |
 | Medium | UX | Exit-intent popup opened after 45 seconds even without a mouse leave, including on phones. | `ExitIntentPopup.tsx` `setTimeout(..., 45000)`. | Fixed. Desktop mouse-leave only. Copy no longer says "Don't miss out". |

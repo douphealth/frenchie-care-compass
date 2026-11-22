@@ -1,26 +1,33 @@
+# Existing worker. Deploy updates this script. Do not rename it: a new name creates a second worker.
 name = "frenchyfab-careplan-selfhosted-proxy"
 main = "careplan-proxy.js"
 compatibility_date = "2026-09-01"
+account_id = "5dc0401c38d9de0c6947fee40a210937"
 
+# Dashboard routes today: the wildcard, the bare host, and the slash path.
+# Keep all three. Dropping the bare host would let that request skip the worker
+# and follow DNS to the gearup-flow-master Pages alias.
 routes = [
+  { pattern = "care-plan.frenchyfab.com", zone_name = "frenchyfab.com" },
+  { pattern = "care-plan.frenchyfab.com/", zone_name = "frenchyfab.com" },
   { pattern = "care-plan.frenchyfab.com/*", zone_name = "frenchyfab.com" },
 ]
 
-# Secrets (set once via Wrangler CLI, never commit values):
-#   npx wrangler secret put STRIPE_SECRET_KEY      # Restricted key with Checkout Sessions: read + write
-#   npx wrangler secret put STRIPE_WEBHOOK_SECRET  # Signing secret (whsec_...) for https://care-plan.frenchyfab.com/functions/v1/stripe-webhook
-#   npx wrangler secret put BREVO_API_KEY          # Brevo API key for list sync + transactional Vault emails
+# Secrets (Wrangler CLI only, never commit values):
+#   npx wrangler secret put STRIPE_SECRET_KEY      # already set on the live worker
+#   npx wrangler secret put STRIPE_WEBHOOK_SECRET  # not set yet
+#   npx wrangler secret put BREVO_API_KEY          # live value is a plain-text var; move it to a secret
+# Do not put BREVO_API_KEY under [vars].
 
-# Durable KV namespace for email deduplication & 10-minute recovery cooldown:
-#   1. Run: npx wrangler kv namespace create CAREPLAN_KV
-#   2. Uncomment the block below and paste the returned namespace ID:
-# [[kv_namespaces]]
-# binding = "CAREPLAN_KV"
-# id = "<PASTE_YOUR_KV_NAMESPACE_ID>"
+# Created in account 5dc0401c38d9de0c6947fee40a210937. Same account as this worker.
+[[kv_namespaces]]
+binding = "CAREPLAN_KV"
+id = "c19be13a9f5c41e3b4dfad50d0e26efd"
 
 [vars]
+# Live dashboard value. Change this before deploy if opt-ins should go to a new Brevo list.
 BREVO_LIST_ID = "8"
 MAIL_FROM = "info@frenchyfab.com"
-# "0" enables dynamic Stripe Checkout Sessions (preserves quiz metadata[answers] across devices).
-# If the Stripe key lacks Checkout Sessions: write, the frontend automatically falls back to Payment Links.
+# Live dashboard is "1" (Payment Links). Deploying this file sets "0" (Checkout Sessions).
+# The app falls back to the Payment Link if Stripe rejects session creation.
 CHECKOUT_VIA_LINKS = "0"

@@ -33,7 +33,15 @@ export const PREMIUM_PRICE_ID = 'price_1TFD07GCqwm95OGXc26k5JkI';
 export const EMERGENCY_CARD_PRICE_ID = 'price_1THjRhGCqwm95OGXJZf9x553';
 
 const WP_ENDPOINT = 'https://frenchyfab.com/wp-json/ffab-care/v1';
-/** Git-connected Cloudflare Pages project: every merge to main deploys here. */
+/**
+ * Static origin for this repo.
+ * Pages project `frenchie-care-compass` in account 284f1a03e12aa7416ab177db3f692c17
+ * publishes main to https://frenchie-care-compass.pages.dev.
+ * DNS for care-plan.frenchyfab.com is a CNAME to frenchie-care-compass.gearup-flow-master.pages.dev,
+ * a branch alias of the different Pages project `gearup-flow-master` in account 5dc0401c38d9de0c6947fee40a210937.
+ * The worker route intercepts the hostname and fetches STATIC_ORIGIN, so the CNAME is not the HTML origin.
+ * Do not point STATIC_ORIGIN at the gearup-flow-master alias.
+ */
 const STATIC_ORIGIN = 'https://frenchie-care-compass.pages.dev';
 const LEAD_STORE = 'https://app-lead-capture.papalexios.workers.dev/app/frenchyfab';
 const DEV_ORIGINS = ['http://localhost:8080', 'http://127.0.0.1:8080'];
@@ -621,6 +629,43 @@ function handleHealth(request, env) {
   });
 }
 
+/** Positive integer from BREVO_LIST_ID. Unset means list 8, the current dashboard value. */
+export function brevoListId(env) {
+  const raw = env.BREVO_LIST_ID == null || String(env.BREVO_LIST_ID).trim() === '' ? '8' : String(env.BREVO_LIST_ID).trim();
+  const id = Number(raw);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+async function brevoErrorText(res) {
+  const detail = await res.text().catch(() => '');
+  return detail.slice(0, 300);
+}
+
+async function brevoUpsertContact(env, email, answers, listId) {
+  const baseAttrs = { SOURCE: 'frenchie-care-app', LAST_CARE_OPTIN_AT: new Date().toISOString() };
+  const attributes = { ...baseAttrs };
+  if (answers) {
+    attributes.FRENCHIE_STAGE = answers.lifeStage;
+    attributes.FRENCHIE_CONCERN = answers.concern;
+  }
+  const send = (attrs) => fetch('https://api.brevo.com/v3/contacts', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'api-key': env.BREVO_API_KEY },
+    body: JSON.stringify({ email, attributes: attrs, listIds: [listId], updateEnabled: true }),
+  });
+
+  let res = await send(attributes);
+  if (!(res.ok || res.status === 204) && answers) {
+    console.error('brevo contact rejected', res.status, 'list', listId, await brevoErrorText(res));
+    res = await send(baseAttrs);
+  }
+  if (!(res.ok || res.status === 204)) {
+    console.error('brevo contact failed', res.status, 'list', listId, await brevoErrorText(res));
+    return false;
+  }
+  return true;
+}
+
 async function handleLeadCapture(request, env) {
   const limited = await rateLimit(request, env, 'lead', 12);
   if (limited) return limited;
@@ -637,40 +682,31 @@ async function handleLeadCapture(request, env) {
       body: JSON.stringify({ email, name: '', source: payload.source || 'frenchie-care-compass', quiz: answers }),
     });
     stored = mirror.ok;
+    if (!mirror.ok) console.error('lead store failed', mirror.status);
   } catch (error) {
     console.error('lead store', error.message);
   }
 
+  if (!env.BREVO_API_KEY) {
+    console.error('brevo contact skipped: BREVO_API_KEY is not set');
+    return json(request, { success: false, message: 'Email capture is not configured. Your plan stays on this device.', stored }, 503);
+  }
+  const listId = brevoListId(env);
+  if (!listId) {
+    console.error('brevo contact skipped: BREVO_LIST_ID is not a positive integer');
+    return json(request, { success: false, message: 'Email capture is not configured. Your plan stays on this device.', stored }, 503);
+  }
+
   let brevo = false;
-  if (env.BREVO_API_KEY) {
-    try {
-      const attrs = { SOURCE: 'frenchie-care-app', LAST_CARE_OPTIN_AT: new Date().toISOString() };
-      if (answers) {
-        attrs.FRENCHIE_STAGE = answers.lifeStage;
-        attrs.FRENCHIE_CONCERN = answers.concern;
-      }
-      const res = await fetch('https://api.brevo.com/v3/contacts', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'api-key': env.BREVO_API_KEY },
-        body: JSON.stringify({ email, attributes: attrs, listIds: [Number(env.BREVO_LIST_ID || 8)], updateEnabled: true }),
-      });
-      brevo = res.ok || res.status === 204;
-      if (!brevo && answers) {
-        const retry = await fetch('https://api.brevo.com/v3/contacts', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', 'api-key': env.BREVO_API_KEY },
-          body: JSON.stringify({ email, attributes: { SOURCE: attrs.SOURCE, LAST_CARE_OPTIN_AT: attrs.LAST_CARE_OPTIN_AT }, listIds: [Number(env.BREVO_LIST_ID || 8)], updateEnabled: true }),
-        });
-        brevo = retry.ok || retry.status === 204;
-      }
-    } catch (error) {
-      console.error('brevo contact', error.message);
-    }
+  try {
+    brevo = await brevoUpsertContact(env, email, answers, listId);
+  } catch (error) {
+    console.error('brevo contact', error.message);
   }
-  if (!brevo && !stored) {
-    return json(request, { success: false, message: 'Lead storage is unavailable. Your plan stays on this device.' }, 502);
+  if (!brevo) {
+    return json(request, { success: false, message: 'We could not save your email. Your plan stays on this device.', brevo: false, stored }, 502);
   }
-  return json(request, { success: true, id: `cf_${Date.now().toString(36)}`, brevo, stored });
+  return json(request, { success: true, id: `cf_${Date.now().toString(36)}`, brevo: true, stored });
 }
 
 async function proxyWp(request, url) {

@@ -8,6 +8,7 @@ import worker, {
   parseAnswers,
   vaultEmailHtml,
   verifyStripeSignature,
+  brevoListId,
 } from '../../worker/careplan-proxy.js';
 
 const SESSION = 'cs_test_a1B2c3D4e5F6g7H8';
@@ -291,6 +292,30 @@ describe('worker: health & lead capture', () => {
     mockFetch([]);
     const res = await worker.fetch(post('/api/ffab-care/v1/lead', { email: 'nope' }), env, undefined);
     expect(res.status).toBe(400);
+  });
+
+  it('reads the Brevo list id from the worker var and defaults to 8', () => {
+    expect(brevoListId({})).toBe(8);
+    expect(brevoListId({ BREVO_LIST_ID: '42' })).toBe(42);
+    expect(brevoListId({ BREVO_LIST_ID: 'nope' })).toBeNull();
+  });
+
+  it('posts the configured Brevo list and does not report success when Brevo rejects the contact', async () => {
+    env.BREVO_LIST_ID = '42';
+    const calls = mockFetch([
+      [/email_subscribers/, ok({})],
+      [/api\.brevo\.com\/v3\/contacts/, () => new Response('{"message":"IP not allowed"}', { status: 401 })],
+    ]);
+    const res = await worker.fetch(post('/api/ffab-care/v1/lead', { email: 'lead@example.com', answers: ANSWERS }), env, undefined);
+    const body = await res.json();
+    expect(res.status).toBe(502);
+    expect(body.success).toBe(false);
+    expect(body.brevo).toBe(false);
+    const contactCalls = calls.filter((c) => c.url.includes('/v3/contacts'));
+    expect(contactCalls.length).toBeGreaterThan(0);
+    for (const call of contactCalls) {
+      expect(JSON.parse(String(call.init?.body)).listIds).toEqual([42]);
+    }
   });
 });
 
