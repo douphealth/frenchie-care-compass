@@ -6,12 +6,21 @@ routes = [
   { pattern = "care-plan.frenchyfab.com/*", zone_name = "frenchyfab.com" },
 ]
 
-# Secrets (set once, never commit values):
-#   npx wrangler secret put STRIPE_SECRET_KEY   # restricted key; Checkout Sessions read is the minimum
-#   npx wrangler secret put BREVO_API_KEY
+# Secrets (set once via Wrangler CLI, never commit values):
+#   npx wrangler secret put STRIPE_SECRET_KEY      # Restricted key with Checkout Sessions: read + write
+#   npx wrangler secret put STRIPE_WEBHOOK_SECRET  # Signing secret (whsec_...) for https://care-plan.frenchyfab.com/functions/v1/stripe-webhook
+#   npx wrangler secret put BREVO_API_KEY          # Brevo API key for list sync + transactional Vault emails
+
+# Durable KV namespace for email deduplication & 10-minute recovery cooldown:
+#   1. Run: npx wrangler kv namespace create CAREPLAN_KV
+#   2. Uncomment the block below and paste the returned namespace ID:
+# [[kv_namespaces]]
+# binding = "CAREPLAN_KV"
+# id = "<PASTE_YOUR_KV_NAMESPACE_ID>"
+
 [vars]
 BREVO_LIST_ID = "8"
 MAIL_FROM = "info@frenchyfab.com"
-# The current Stripe key cannot create Checkout Sessions, so checkout uses the Payment Links.
-# Remove this once the key has Checkout Sessions: write.
-CHECKOUT_VIA_LINKS = "1"
+# "0" enables dynamic Stripe Checkout Sessions (preserves quiz metadata[answers] across devices).
+# If the Stripe key lacks Checkout Sessions: write, the frontend automatically falls back to Payment Links.
+CHECKOUT_VIA_LINKS = "0"

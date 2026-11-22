@@ -62,6 +62,18 @@ const Index = () => {
     setHydrated(true);
   }, []);
 
+  useEffect(() => {
+    const titles: Record<Screen, string> = {
+      landing: 'Frenchie Care Plan in 60 Seconds | FrenchyFab Care Compass',
+      quiz: 'Frenchie care quiz | FrenchyFab Care Compass',
+      loading: 'Building your Frenchie care plan | FrenchyFab',
+      emailGate: 'Save your Frenchie care plan | FrenchyFab',
+      results: 'Your Frenchie care plan | FrenchyFab',
+      upsell: 'Frenchie Care Vault | FrenchyFab',
+    };
+    document.title = titles[screen];
+  }, [screen]);
+
   // Persist key state
   useEffect(() => {
     if (!hydrated) return;

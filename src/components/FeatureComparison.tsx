@@ -1,27 +1,12 @@
 import { motion } from 'framer-motion';
 import { Check, X, Crown } from 'lucide-react';
-
-const features = [
-  { name: 'Personalized care plan', free: true, premium: true },
-  { name: 'Feeding recommendations', free: true, premium: true },
-  { name: 'Grooming routine', free: true, premium: true },
-  { name: 'Exercise guidelines', free: true, premium: true },
-  { name: 'Custom feeding charts & portions', free: false, premium: true },
-  { name: 'Printable grooming checklist', free: false, premium: true },
-  { name: 'Seasonal care calendar', free: false, premium: true },
-  { name: 'Vet visit prep sheets', free: false, premium: true },
-  { name: 'Emergency red-flag checklist', free: false, premium: true },
-  { name: '"When to call the vet" guide', free: false, premium: true },
-  { name: 'Safety product notes', free: true, premium: true },
-  { name: 'Vault PDF with charts and checklists', free: false, premium: true },
-  { name: 'Emergency red-flag checklist', free: false, premium: true },
-];
+import { COMPARISON_FEATURES } from '@/lib/comparisonFeatures';
 
 const FeatureComparison = () => (
   <motion.div
-    initial={{ opacity: 0, y: 16 }}
+    initial={{ opacity: 0, y: 12 }}
     animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.5 }}
+    transition={{ duration: 0.35 }}
     className="glass-card rounded-2xl overflow-hidden"
   >
     {/* Header */}
@@ -40,12 +25,12 @@ const FeatureComparison = () => (
 
     {/* Rows */}
     <div className="divide-y divide-border/50">
-      {features.map((f, i) => (
+      {COMPARISON_FEATURES.map((f, i) => (
         <motion.div
-          key={i}
+          key={f.name}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: i * 0.03 }}
+          transition={{ delay: i * 0.02 }}
           className="grid grid-cols-3 items-center"
         >
           <div className="px-4 py-2.5">

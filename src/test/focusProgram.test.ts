@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildFocusProgram } from '@/lib/focusProgram';
+import { publicFocusTitle } from '@/lib/publicFocus';
 import { formatCups } from '@/lib/clinical';
 import { generatePlan } from '@/lib/planGenerator';
 import { includedPremiumPages } from '@/lib/pdfOutline';
@@ -30,6 +31,12 @@ describe('4-week focus program', () => {
   it('uses hot-climate guidance when the dog lives somewhere hot', () => {
     const hot = buildFocusProgram({ ...base, environment: ['hot'] });
     expect(hot.weeks[1].actions.join(' ')).toMatch(/somewhere hot/);
+  });
+
+  it('uses the same public teaser title as the paid program', () => {
+    for (const concern of ['skin', 'pulling', 'diet', 'breathing', 'wellness']) {
+      expect(publicFocusTitle(concern)).toBe(buildFocusProgram({ ...base, concern }).title);
+    }
   });
 
   it('is the first page of the paid PDF and absent from the free one', () => {

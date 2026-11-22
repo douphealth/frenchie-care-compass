@@ -29,9 +29,9 @@ const EmailGate = ({ plan, email, setEmail, onSubmit }: Props) => (
         >
           <CheckCircle2 className="w-9 h-9 text-emerald-600" />
         </motion.div>
-        <h2 className="text-2xl md:text-3xl font-black text-foreground font-display leading-tight">
-          Your Care Plan is Ready!
-        </h2>
+        <h1 className="text-2xl md:text-3xl font-black text-foreground font-display leading-tight">
+          Your Care Plan is Ready
+        </h1>
         <p className="text-sm text-muted-foreground max-w-xs mx-auto">
           We've generated a personalized plan just for your Frenchie. Enter your email to save it and reveal the full free plan.
         </p>
@@ -59,6 +59,8 @@ const EmailGate = ({ plan, email, setEmail, onSubmit }: Props) => (
           <div className="flex gap-2">
             <Input
               type="email"
+              aria-label="Email address"
+              autoComplete="email"
               placeholder="your@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -71,8 +73,8 @@ const EmailGate = ({ plan, email, setEmail, onSubmit }: Props) => (
             </Button>
           </div>
           <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1"><Lock className="w-3 h-3" /> No spam ever</span>
-            <span className="flex items-center gap-1"><Users className="w-3 h-3" /> Saved in this browser</span>
+            <span className="flex items-center gap-1"><Lock className="w-3 h-3" /> Used to save your plan</span>
+            <span className="flex items-center gap-1"><Users className="w-3 h-3" /> Kept on this device</span>
           </div>
         </motion.form>
       </div>

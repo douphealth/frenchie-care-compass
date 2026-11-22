@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 const Index = React.lazy(() => import("./pages/Index.tsx"));
 const PaymentSuccess = React.lazy(() => import("./pages/PaymentSuccess.tsx"));
+const Account = React.lazy(() => import("./pages/Account.tsx"));
 const NotFound = React.lazy(() => import("./pages/NotFound.tsx"));
 
 const queryClient = new QueryClient();
@@ -26,9 +27,13 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <a href="#root" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-foreground">
+          Skip to content
+        </a>
         <Suspense fallback={<LoadingFallback />}>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/account" element={<Account />} />
             <Route path="/payment-success" element={<PaymentSuccess />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

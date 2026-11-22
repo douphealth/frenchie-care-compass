@@ -59,7 +59,7 @@ const QuizStep = ({
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
         className="text-center space-y-2"
       >
-        <h2 className="text-xl md:text-2xl font-bold text-foreground font-display">{question}</h2>
+        <h1 className="text-xl md:text-2xl font-bold text-foreground font-display">{question}</h1>
         <p className="text-sm text-muted-foreground max-w-sm mx-auto">{subtitle}</p>
       </motion.div>
 
