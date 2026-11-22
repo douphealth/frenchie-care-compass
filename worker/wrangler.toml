@@ -14,10 +14,10 @@ routes = [
 ]
 
 # Secrets (Wrangler CLI only, never commit values):
-#   npx wrangler secret put STRIPE_SECRET_KEY      # already set on the live worker
-#   npx wrangler secret put STRIPE_WEBHOOK_SECRET  # not set yet
-#   npx wrangler secret put BREVO_API_KEY          # live value is a plain-text var; move it to a secret
-# Do not put BREVO_API_KEY under [vars].
+#   STRIPE_SECRET_KEY      set. Replace it with the MyFrenchyBulldog restricted key
+#                          (Checkout Sessions read + checkout_session_write) before flipping CHECKOUT_VIA_LINKS.
+#   STRIPE_WEBHOOK_SECRET  set. Endpoint we_1UeYW8GCqwm95OGXL7So4Hpj.
+#   BREVO_API_KEY          secret. Do not put this key under [vars].
 
 # Created in account 5dc0401c38d9de0c6947fee40a210937. Same account as this worker.
 [[kv_namespaces]]
@@ -25,12 +25,13 @@ binding = "CAREPLAN_KV"
 id = "c19be13a9f5c41e3b4dfad50d0e26efd"
 
 [vars]
-# Live dashboard value. Change this before deploy if opt-ins should go to a new Brevo list.
-BREVO_LIST_ID = "8"
+# Frenchie Care Plan Leads. List 8 belongs to another app.
+BREVO_LIST_ID = "13"
 MAIL_FROM = "info@frenchyfab.com"
-# Live dashboard is "1" (Payment Links). Deploying this file sets "0" (Checkout Sessions).
-# The app falls back to the Payment Link if Stripe rejects session creation.
-CHECKOUT_VIA_LINKS = "0"
-# "0" skips invoice_creation on Checkout Sessions. Any other value, including unset, creates
-# an invoice so the Customer Portal (default config bpc_1UeYeZGCqwm95OGXOTbnvceF) can show it.
+# Keep "1" so a plain `wrangler deploy` stays on Payment Links.
+# Flip to "0" only after STRIPE_SECRET_KEY on the worker is the MyFrenchyBulldog
+# restricted key with checkout_session_write.
+CHECKOUT_VIA_LINKS = "1"
+# "0" skips invoice_creation on Checkout Sessions. "1" creates an invoice for the
+# Customer Portal (default config bpc_1UeYeZGCqwm95OGXOTbnvceF).
 INVOICE_CREATION = "1"
