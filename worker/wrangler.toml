@@ -31,3 +31,6 @@ MAIL_FROM = "info@frenchyfab.com"
 # Live dashboard is "1" (Payment Links). Deploying this file sets "0" (Checkout Sessions).
 # The app falls back to the Payment Link if Stripe rejects session creation.
 CHECKOUT_VIA_LINKS = "0"
+# "0" skips invoice_creation on Checkout Sessions. Any other value, including unset, creates
+# an invoice so the Customer Portal (default config bpc_1UeYeZGCqwm95OGXOTbnvceF) can show it.
+INVOICE_CREATION = "1"

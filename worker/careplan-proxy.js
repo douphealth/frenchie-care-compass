@@ -20,6 +20,8 @@
  *                         Without it, fulfilment email is skipped and accounts return 503.
  *                         Recovery cooldowns fall back to the edge cache.
  *   CHECKOUT_VIA_LINKS    "0" (default) = dynamic Checkout Sessions; "1" = force static Payment Links.
+ *   INVOICE_CREATION      unset or any value other than "0" creates a Stripe invoice on the
+ *                         Checkout Session so it shows in the Customer Portal. "0" disables it.
  *   BREVO_API_KEY         secret. Used for the list sync and the access-link emails.
  *   BREVO_LIST_ID         optional, defaults to 8.
  *   MAIL_FROM             optional, defaults to info@frenchyfab.com (must be a Brevo-verified sender).
@@ -401,6 +403,7 @@ async function createPayment(request, env) {
     'payment_intent_data[metadata][product]': 'frenchie-care-vault',
     'payment_intent_data[description]': 'Frenchie Care Vault by FrenchyFab',
   };
+  if (env.INVOICE_CREATION !== '0') fields['invoice_creation[enabled]'] = 'true';
   if (isValidEmail(email)) fields.customer_email = email;
   if (answers) fields['metadata[answers]'] = JSON.stringify(answers);
   if (addBump) {
@@ -570,7 +573,7 @@ async function billingPortal(request, env) {
   const customer = typeof session.customer === 'string' ? session.customer : null;
   if (!customer) {
     return json(request, {
-      error: 'This checkout has no Stripe customer on file. Use the receipt email, or write to info@frenchyfab.com, to ask about a refund.',
+      error: 'We could not find a receipt for this checkout yet. Email info@frenchyfab.com and we will send it or help with a refund.',
     }, 409);
   }
   try {
@@ -578,11 +581,18 @@ async function billingPortal(request, env) {
       method: 'POST',
       body: formBody({ customer, return_url: `${allowedOrigin(request)}/` }),
     });
-    if (!portal.url) return json(request, { error: 'Stripe did not return a portal URL' }, 502);
+    if (!portal.url) {
+      console.error('billing-portal missing url');
+      return json(request, {
+        error: 'Receipts are not available right now. Email info@frenchyfab.com and we will send your receipt or help with a refund.',
+      }, 502);
+    }
     return json(request, { url: portal.url });
   } catch (error) {
     console.error('billing-portal', error.message);
-    return json(request, { error: 'The billing portal is not available. Email info@frenchyfab.com for a receipt or refund.' }, 502);
+    return json(request, {
+      error: 'Receipts are not available right now. Email info@frenchyfab.com and we will send your receipt or help with a refund.',
+    }, 502);
   }
 }
 
