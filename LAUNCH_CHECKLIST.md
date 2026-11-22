@@ -66,13 +66,13 @@ Then in the worker settings, delete the plain-text `BREVO_API_KEY` variable. Do 
 
 ## 5. Customer portal
 
-New Checkout Sessions set `customer_creation=always`. Payment Links already in use may have no Customer.
+The default Customer Portal configuration `bpc_1UeYeZGCqwm95OGXOTbnvceF` is already on and includes invoice history. Checkout Sessions keep `customer_creation=always`. They also send `invoice_creation[enabled]=true` unless `INVOICE_CREATION` is `"0"`, so a paid session creates an invoice the portal can list. That flag is in the worker. It does nothing until the worker is deployed. Payment Links already in use may have no Customer and no invoice.
 
-1. Stripe → Settings → Billing → Customer portal: turn it on for invoice history. There is no subscription to cancel.
+1. Leave the default portal configuration in place. There is no subscription to cancel.
 2. Public business name: **FrenchyFab**. The live Payment Link still shows **MyFrenchyBulldog** and **Premium Frenchie Care Guide PDF**.
 3. Rename the $7.99 product to **Frenchie Care Vault** and the $4.99 product to **One-page emergency fridge card**.
 
-The payment-success page calls `POST /functions/v1/billing-portal`. A guest checkout with no customer gets a 409 and the support address `info@frenchyfab.com`.
+The payment-success page calls `POST /functions/v1/billing-portal`. If the checkout has no customer, the buyer is told to email `info@frenchyfab.com` for the receipt or a refund. The same address is used when the portal itself cannot be opened.
 
 ## 6. Frontend origin
 

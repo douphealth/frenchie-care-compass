@@ -196,6 +196,38 @@ describe('worker: /functions/v1/stripe-webhook', () => {
     expect(retryRes.status).toBe(200);
     expect(retryCalls.some((c) => c.url.includes('smtp/email'))).toBe(false);
   });
+
+  it('still fulfils checkout.session.completed when Stripe also created an invoice', async () => {
+    const payload = JSON.stringify({ type: 'checkout.session.completed', data: { object: { id: SESSION, invoice: 'in_123' } } });
+    const sig = await signWebhook(payload, baseEnv.STRIPE_WEBHOOK_SECRET);
+    const calls = mockFetch([
+      [/checkout\/sessions\/cs_test/, ok(paidSession({ invoice: 'in_123', invoice_creation: { enabled: true } }))],
+      [/smtp\/email/, ok({ messageId: 'inv1' })],
+    ]);
+    const res = await worker.fetch(new Request('https://care-plan.frenchyfab.com/functions/v1/stripe-webhook', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'stripe-signature': sig },
+      body: payload,
+    }), env, undefined);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ received: true, fulfilled: true });
+    expect(calls.filter((c) => c.url.includes('smtp/email'))).toHaveLength(1);
+    expect(isPaidVaultSession(paidSession({ invoice: 'in_123', invoice_creation: { enabled: true } }))).toBe(true);
+  });
+
+  it('acknowledges invoice.paid without retrieving the session or sending email', async () => {
+    const payload = JSON.stringify({ type: 'invoice.paid', data: { object: { id: 'in_123', customer: 'cus_123' } } });
+    const sig = await signWebhook(payload, baseEnv.STRIPE_WEBHOOK_SECRET);
+    const calls = mockFetch([]);
+    const res = await worker.fetch(new Request('https://care-plan.frenchyfab.com/functions/v1/stripe-webhook', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'stripe-signature': sig },
+      body: payload,
+    }), env, undefined);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ received: true, ignored: true });
+    expect(calls).toHaveLength(0);
+  });
 });
 
 describe('worker: unknown sessions', () => {
@@ -215,9 +247,19 @@ describe('worker: /functions/v1/create-payment', () => {
     const form = new URLSearchParams(String(calls[0].init?.body));
     expect(form.get('success_url')).toBe('https://care-plan.frenchyfab.com/payment-success?session_id={CHECKOUT_SESSION_ID}');
     expect(form.get('customer_creation')).toBe('always');
+    expect(form.get('invoice_creation[enabled]')).toBe('true');
     expect(form.get('line_items[0][price]')).toBe(PREMIUM_PRICE_ID);
     expect(form.get('line_items[1][price]')).toBe(EMERGENCY_CARD_PRICE_ID);
     expect(JSON.parse(form.get('metadata[answers]') || '{}')).toEqual(ANSWERS);
+  });
+
+  it('leaves invoice creation off when INVOICE_CREATION=0 and still creates a customer', async () => {
+    const calls = mockFetch([[/checkout\/sessions$/, ok({ id: SESSION, url: 'https://checkout.stripe.com/c/pay/x' })]]);
+    const res = await worker.fetch(post('/functions/v1/create-payment', { email: 'a@b.co', answers: ANSWERS }), { ...env, INVOICE_CREATION: '0' }, undefined);
+    expect(res.status).toBe(200);
+    const form = new URLSearchParams(String(calls[0].init?.body));
+    expect(form.get('customer_creation')).toBe('always');
+    expect(form.get('invoice_creation[enabled]')).toBeNull();
   });
 
   it('never auto-emails without KV, so it cannot repeat on every visit', async () => {
@@ -226,6 +268,29 @@ describe('worker: /functions/v1/create-payment', () => {
     const body = await (await worker.fetch(post('/functions/v1/verify-payment', { sessionId: SESSION, fulfil: true }), env, undefined)).json();
     expect(body.paid).toBe(true);
     expect(calls.some((c) => c.url.includes('brevo'))).toBe(false);
+  });
+});
+
+describe('worker: /functions/v1/billing-portal', () => {
+  it('tells the buyer to email support when the checkout has no customer', async () => {
+    mockFetch([[/checkout\/sessions\/cs_test/, ok(paidSession({ customer: null }))]]);
+    const res = await worker.fetch(post('/functions/v1/billing-portal', { sessionId: SESSION }), env, undefined);
+    const body = await res.json();
+    expect(res.status).toBe(409);
+    expect(body.error).toMatch(/info@frenchyfab.com/);
+    expect(body.error).toMatch(/receipt/i);
+  });
+
+  it('uses a support message when Stripe cannot open the portal', async () => {
+    mockFetch([
+      [/checkout\/sessions\/cs_test/, ok(paidSession({ customer: 'cus_123' }))],
+      [/billing_portal\/sessions/, () => new Response(JSON.stringify({ error: { message: 'No such configuration' } }), { status: 400 })],
+    ]);
+    const res = await worker.fetch(post('/functions/v1/billing-portal', { sessionId: SESSION }), env, undefined);
+    const body = await res.json();
+    expect(res.status).toBe(502);
+    expect(body.error).toMatch(/info@frenchyfab.com/);
+    expect(body.error).not.toMatch(/No such configuration/);
   });
 });
 
