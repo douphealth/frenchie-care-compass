@@ -50,15 +50,15 @@ const DEV_ORIGINS = ['http://localhost:8080', 'http://127.0.0.1:8080'];
 const RECOVERY_COOLDOWN_S = 10 * 60;
 const WEBHOOK_TOLERANCE_S = 5 * 60;
 const SUPPORT_EMAIL = 'info@frenchyfab.com';
-const WORKER_VERSION = 'worker-2026-11-22';
+const WORKER_VERSION = 'worker-2026-11-25';
 
 const SECURITY_CSP = [
   "default-src 'self'",
-  "script-src 'self'",
+  "script-src 'self' https://static.cloudflareinsights.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob: https://care-plan.frenchyfab.com",
-  "connect-src 'self' https://care-plan.frenchyfab.com",
+  "connect-src 'self' https://care-plan.frenchyfab.com https://cloudflareinsights.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self' https://checkout.stripe.com https://buy.stripe.com",
