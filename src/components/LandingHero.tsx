@@ -88,7 +88,7 @@ const LandingHero = ({ onStart }: Props) => (
       {/* Trust signals */}
       <div className="flex items-center justify-center gap-2">
         <p className="text-xs text-muted-foreground">
-          <span className="font-bold text-foreground">Free to start</span> · Email saves your plan · Not a substitute for vet care
+          <span className="font-bold text-foreground">Free plan, no email needed</span> · Not a substitute for vet care
         </p>
       </div>
 

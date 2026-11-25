@@ -11,7 +11,7 @@ import { isValidEmail, normalizeEmail } from '@/lib/quizValidation';
 import { generatePlan } from '@/lib/planGenerator';
 import { toast } from '@/hooks/use-toast';
 
-type Status = 'checking' | 'unlocked' | 'unconfirmed' | 'missing' | 'error';
+type Status = 'checking' | 'unlocked' | 'unconfirmed' | 'missing' | 'restore' | 'error';
 
 const PaymentSuccess = () => {
   const navigate = useNavigate();
@@ -28,7 +28,7 @@ const PaymentSuccess = () => {
     setSessionId(sessionFromUrl);
     const viaEmail = params.get('via') === 'email';
     if (!sessionFromUrl) {
-      setStatus('missing');
+      setStatus(params.get('restore') === '1' ? 'restore' : 'missing');
       return;
     }
     let cancelled = false;
@@ -65,6 +65,7 @@ const PaymentSuccess = () => {
       unlocked: 'Vault unlocked | FrenchyFab Care Compass',
       unconfirmed: 'Payment not confirmed | FrenchyFab Care Compass',
       missing: 'Payment not confirmed | FrenchyFab Care Compass',
+      restore: 'Restore purchase | FrenchyFab Care Compass',
       error: 'Payment check unavailable | FrenchyFab Care Compass',
     };
     document.title = titles[status];
@@ -120,7 +121,7 @@ const PaymentSuccess = () => {
     }
     try {
       await requestPurchaseRecovery(normalizeEmail(recoveryEmail));
-      setRecoveryMessage('If that email has a confirmed purchase, we sent an access link. Check your inbox.');
+      setRecoveryMessage('If that email has a paid Care Vault purchase, we just emailed a link that reopens it. Check your inbox and spam folder.');
     } catch {
       setRecoveryMessage('We could not send a recovery email from this server. Keep your Stripe receipt and email info@frenchyfab.com.');
     }
@@ -132,12 +133,14 @@ const PaymentSuccess = () => {
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-        className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 ${status === 'unlocked' || status === 'checking' ? 'bg-success/20' : 'bg-destructive/10'}`}
+        className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 ${status === 'unlocked' || status === 'checking' ? 'bg-success/20' : status === 'restore' ? 'bg-muted' : 'bg-destructive/10'}`}
       >
         {status === 'checking' ? (
           <Loader2 className="w-10 h-10 text-success animate-spin" />
         ) : status === 'unlocked' ? (
           <CheckCircle2 className="w-10 h-10 text-success" />
+        ) : status === 'restore' ? (
+          <Mail className="w-10 h-10 text-primary" />
         ) : (
           <AlertCircle className="w-10 h-10 text-destructive" />
         )}
@@ -145,14 +148,15 @@ const PaymentSuccess = () => {
 
       <div className="space-y-3">
         <h1 className="text-2xl md:text-3xl font-black text-foreground font-display">
-          {status === 'unlocked' ? 'Vault unlocked' : status === 'checking' ? 'Checking payment' : status === 'error' ? 'Payment check unavailable' : 'Payment not confirmed'}
+          {status === 'unlocked' ? 'Vault unlocked' : status === 'checking' ? 'Checking payment' : status === 'error' ? 'Payment check unavailable' : status === 'restore' ? 'Restore purchase' : 'Payment not confirmed'}
         </h1>
         <p className="text-muted-foreground text-sm max-w-sm mx-auto">
           {status === 'unlocked' && (hasProfile
             ? 'Stripe confirmed this purchase. Download the vault PDF, or open your plan to see the premium modules.'
             : 'Stripe confirmed this purchase and saved your access on this browser. Take the 5-question quiz once to personalize your Vault PDF.')}
           {status === 'checking' && 'We are asking Stripe whether this checkout was paid. The vault stays locked until that check succeeds.'}
-          {status === 'missing' && 'This page does not unlock anything by itself. Finish checkout, or use the recovery form with the email on your Stripe receipt.'}
+          {status === 'missing' && 'This page does not unlock anything by itself. Finish checkout, or restore a purchase with the email on your Stripe receipt.'}
+          {status === 'restore' && 'Bought the Care Vault before, or on another device? Enter the email you used at Stripe checkout. If it has a paid Care Vault purchase, we email you a link that reopens your Vault here.'}
           {status === 'unconfirmed' && 'Stripe did not confirm a paid session for this link. You have not been charged by this page, and the vault stays locked.'}
           {status === 'error' && 'We could not reach the payment check just now. If you paid, your payment is safe: reload this page in a minute, or use the form below to get your access link by email.'}
         </p>
@@ -194,14 +198,15 @@ const PaymentSuccess = () => {
         )}
         {status === 'unlocked' && (
           <p className="text-xs text-muted-foreground">
-            This is a one-time purchase, not a subscription. Bookmark this page: the link reopens your vault on any device. We also email it to you.
+            This is a one-time purchase, not a subscription. Bookmark this page: the link reopens your vault on any device. We also email it to you. Lost it? Use <a href="/payment-success?restore=1" className="underline">Restore purchase</a> with your checkout email.
           </p>
         )}
       </div>
 
       {status !== 'unlocked' && status !== 'checking' && (
         <form onSubmit={sendRecovery} className="mt-8 w-full max-w-xs space-y-2 text-left">
-          <label htmlFor="recovery-email" className="text-xs font-bold text-foreground">Already paid?</label>
+          {status !== 'restore' && <h2 className="text-sm font-black text-foreground">Restore purchase</h2>}
+          <label htmlFor="recovery-email" className="text-xs font-bold text-foreground">Email used at checkout</label>
           <input
             id="recovery-email"
             type="email"
@@ -213,7 +218,7 @@ const PaymentSuccess = () => {
           />
           <Button type="submit" variant="outline" className="w-full h-11 rounded-xl font-bold gap-2">
             <Mail className="w-4 h-4" />
-            Email me an access link
+            Restore my Vault
           </Button>
           {recoveryMessage && <p className="text-xs text-muted-foreground">{recoveryMessage}</p>}
         </form>

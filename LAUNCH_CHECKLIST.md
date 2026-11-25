@@ -19,6 +19,17 @@ Routes stay `care-plan.frenchyfab.com`, `care-plan.frenchyfab.com/`, and `care-p
 - `CAREPLAN_KV` is bound.
 - `INVOICE_CREATION` is on, so Checkout Sessions created after the worker that contains this flag is deployed will also create an invoice. Payment Links already do.
 
+## Stripe product wording (owner, Stripe dashboard)
+
+The vault Payment Link `https://buy.stripe.com/dRm14ncpW1qw3oh9f0ejK09` already charges $7.99 USD, one-time, in live mode (checked on its checkout page 2026-11-25). Its product is still named "Premium Frenchie Care Guide PDF" and the description says "12-page". The site sells it as "Frenchie Care Vault". Edit the product of price `price_1TFD07GCqwm95OGXc26k5JkI` (do not create a new price; the code and JSON-LD use this one):
+
+- Name: `Frenchie Care Vault`
+- Description: `Personalized French Bulldog care vault: a 4-week program for your main concern, daily routine and feeding chart, grooming, seasonal and vet-visit checklists, and an emergency red-flag guide, as a printable PDF. General education, not veterinary advice.`
+- Price stays $7.99 USD, one-time.
+- On both Payment Links, After payment → "Don't show confirmation page" → redirect to `https://care-plan.frenchyfab.com/payment-success?session_id={CHECKOUT_SESSION_ID}` (set on 2026-11-10; confirm it is unchanged).
+
+If the price ever changes, change `VAULT_PRICE_USD` in `src/lib/stripeConfig.ts` and the JSON-LD offer in `index.html` together. `src/test/vaultOffer.test.tsx` fails when they differ.
+
 ## Remaining owner steps
 
 1. Paste the MyFrenchyBulldog restricted key into `STRIPE_SECRET_KEY`. It needs Checkout Sessions read and `checkout_session_write`. Then set `CHECKOUT_VIA_LINKS` to `"0"` in `worker/wrangler.toml` and deploy the worker. Until that key is on the worker, leave the flag at `"1"`.

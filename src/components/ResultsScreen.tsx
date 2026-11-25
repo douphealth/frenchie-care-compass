@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { RefreshCcw, Share2, Download, Loader2, Star, Shield, Award, Printer, CalendarPlus, ChevronRight } from 'lucide-react';
+import { RefreshCcw, Share2, Download, Loader2, Shield, Award, Printer, CalendarPlus, ChevronRight } from 'lucide-react';
 import PlanResults from './PlanResults';
 import { PlanSection } from '@/lib/planGenerator';
 import { QuizAnswers } from '@/lib/quizData';
@@ -12,7 +12,8 @@ import BoasScorecard from './results/BoasScorecard';
 import HeatStressMeter from './results/HeatStressMeter';
 import UrgentVetBanner from './results/UrgentVetBanner';
 import AffiliateGrid from './results/AffiliateGrid';
-import LeadGateModal from './LeadGateModal';
+import VaultPricing from './results/VaultPricing';
+import OptionalEmailSignup from './results/OptionalEmailSignup';
 import { buildIcs, downloadIcs } from '@/lib/icsGenerator';
 import { loadProfile, saveProfile } from '@/lib/profileStore';
 import { canAccessPremium, Entitlement } from '@/lib/entitlement';
@@ -28,19 +29,15 @@ type Props = {
   onUpgrade: () => void;
 };
 
-type GateAction = 'pdf' | 'ics' | null;
-
 const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
   const [boasLevel, setBoasLevel] = useState<'low' | 'moderate' | 'urgent'>('low');
   const [heatZone, setHeatZone] = useState<'safe' | 'caution' | 'danger' | 'emergency'>('safe');
-  const [gate, setGate] = useState<GateAction>(null);
   const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [vault, setVault] = useState<VaultPack | null>(null);
   const [vaultState, setVaultState] = useState<'idle' | 'loading' | 'error'>('idle');
 
   const stored = useMemo(() => loadProfile(), []);
-  const hasLead = !!stored.leadCaptured || !!stored.email;
   const premium = canAccessPremium(entitlement);
   const [recheck, setRecheck] = useState<'idle' | 'checking' | 'failed'>(stored.entitlement ? 'checking' : 'idle');
   const purchaseOnRecord = Boolean(stored.entitlement) && !premium;
@@ -156,19 +153,8 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
     window.print();
   };
 
-  const requestAction = (action: GateAction) => {
-    if (hasLead) {
-      if (action === 'pdf') runDownloadPdf();
-      if (action === 'ics') runDownloadIcs();
-    } else {
-      setGate(action);
-    }
-  };
-
-  const handleUnlock = () => {
-    if (gate === 'pdf') runDownloadPdf();
-    if (gate === 'ics') runDownloadIcs();
-  };
+  // The free PDF and calendar file need no email. Pricing hides while a saved purchase is being re-checked.
+  const showPricing = !premium && !(purchaseOnRecord && recheck !== 'idle');
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
@@ -233,6 +219,11 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
         {/* Plan Content */}
         <PlanResults sections={plan} />
 
+        {/* The paid offer sits right after the free result. */}
+        {showPricing && (
+          <VaultPricing answers={answers} programTitle={publicFocusTitle(answers.concern)} onDetails={onUpgrade} />
+        )}
+
         {/* Affiliate grid */}
         <AffiliateGrid answers={answers} />
 
@@ -248,10 +239,10 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
           />
         </div>
 
-        {/* Action buttons (lead-gated) */}
+        {/* Free downloads: no email needed */}
         <div className="no-print mt-6 grid grid-cols-1 gap-3">
           <Button
-            onClick={() => requestAction('ics')}
+            onClick={runDownloadIcs}
             className="w-full h-14 rounded-2xl font-bold gap-2.5 text-base bg-primary text-primary-foreground hover:bg-primary/90"
           >
             <CalendarPlus className="w-5 h-5" />
@@ -260,7 +251,7 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
 
           <div className="grid grid-cols-2 gap-3">
             <Button
-              onClick={() => requestAction('pdf')}
+              onClick={runDownloadPdf}
               disabled={pdfLoading}
               variant="outline"
               className="h-12 rounded-xl font-bold gap-2 border-2"
@@ -279,7 +270,7 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
           </div>
         </div>
 
-        {/* Premium Upgrade CTA: never shown to someone who already bought */}
+        {/* Shown while a saved purchase is re-checked, instead of the pricing */}
         {purchaseOnRecord && recheck !== 'idle' && (
           <div className="no-print mt-5 rounded-2xl border border-border bg-card p-5 text-center">
             <p className="text-sm font-bold text-foreground">
@@ -292,36 +283,7 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
             )}
           </div>
         )}
-        {!premium && !(purchaseOnRecord && recheck !== 'idle') && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
-          className="no-print mt-5 relative overflow-hidden rounded-2xl border-2 border-warning/60 bg-gradient-to-br from-warning/10 via-warning/5 to-card p-6"
-        >
-          <div className="relative">
-            <div className="flex items-center gap-2 mb-2">
-              <Star className="w-5 h-5 text-warning fill-warning" />
-              <span className="text-xs font-black uppercase tracking-wider text-warning">Frenchie Care Vault</span>
-            </div>
-            <h3 className="text-lg font-black text-foreground font-display mb-1">
-              Unlock the Complete Care Operating System
-            </h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              A 4-week plan for your main concern, plus the routine, checklists and a longer printable PDF. Yours to keep.
-            </p>
-            <Button
-              onClick={onUpgrade}
-              className="w-full h-12 rounded-xl font-black text-base gold-gradient text-premium-gold-foreground shadow-lg"
-            >
-              Unlock My Frenchie Care Vault — $7.99
-            </Button>
-            <p className="text-center text-xs text-muted-foreground mt-2">
-              One-time · Instant download · No subscription
-            </p>
-          </div>
-        </motion.div>
-        )}
+        {!stored.leadCaptured && <OptionalEmailSignup answers={answers} plan={plan} />}
 
         {/* Actions */}
         <div className="no-print mt-6 flex items-center justify-center gap-3">
@@ -354,16 +316,6 @@ const ResultsScreen = ({ plan, answers, onStartOver, onUpgrade }: Props) => {
         </div>
       </div>
 
-      <LeadGateModal
-        open={!!gate}
-        onClose={() => setGate(null)}
-        onUnlock={handleUnlock}
-        answers={answers}
-        plan={plan}
-        initialEmail={stored.email || ''}
-        title={gate === 'ics' ? 'Sync care tasks to your calendar' : 'Download your free PDF'}
-        cta={gate === 'ics' ? 'Email me & download .ics' : 'Email me & download PDF'}
-      />
     </div>
   );
 };

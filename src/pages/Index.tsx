@@ -2,19 +2,18 @@ import { useEffect, useState, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import LandingHero from '@/components/LandingHero';
 import QuizScreen from '@/components/QuizScreen';
-import EmailGate from '@/components/EmailGate';
 import ResultsScreen from '@/components/ResultsScreen';
 import PremiumUpsell from '@/components/PremiumUpsell';
 import LoadingScreen from '@/components/LoadingScreen';
 import ExitIntentPopup from '@/components/ExitIntentPopup';
 import { quizSteps, QuizAnswers } from '@/lib/quizData';
 import { generatePlan, PlanSection } from '@/lib/planGenerator';
-import { retryPendingLead, submitLead, trackRevenueEvent } from '@/lib/revenueBackend';
+import { retryPendingLead, trackRevenueEvent } from '@/lib/revenueBackend';
 import { loadProfile, saveProfile, clearProfile } from '@/lib/profileStore';
-import { isValidEmail, normalizeEmail, parseQuizAnswers } from '@/lib/quizValidation';
+import { parseQuizAnswers } from '@/lib/quizValidation';
 import { toast } from '@/hooks/use-toast';
 
-type Screen = 'landing' | 'quiz' | 'loading' | 'emailGate' | 'results' | 'upsell';
+type Screen = 'landing' | 'quiz' | 'loading' | 'results' | 'upsell';
 
 const defaultAnswers: QuizAnswers = {
   lifeStage: '', weight: '', bodyCondition: 5, concern: '', activityLevel: '', environment: [],
@@ -24,7 +23,6 @@ const Index = () => {
   const [screen, setScreen] = useState<Screen>('landing');
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<QuizAnswers>(defaultAnswers);
-  const [email, setEmail] = useState('');
   const [plan, setPlan] = useState<PlanSection[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
@@ -32,7 +30,6 @@ const Index = () => {
   useEffect(() => {
     const stored = loadProfile();
     if (stored.answers) setAnswers(stored.answers);
-    if (stored.email) setEmail(stored.email);
     // Rebuild the plan from the saved answers so returning visitors get current guidance,
     // not text cached by an older version of the app.
     const savedAnswers = parseQuizAnswers(stored.answers);
@@ -53,7 +50,7 @@ const Index = () => {
         title: 'Checkout cancelled',
         description: 'No payment was taken. The free plan is still here.',
       });
-    } else if (stored.plan && stored.answers && stored.email) {
+    } else if (stored.plan && stored.answers) {
       setScreen('results');
     } else if (stored.screen === 'quiz' && typeof stored.step === 'number') {
       setScreen('quiz');
@@ -67,7 +64,6 @@ const Index = () => {
       landing: 'Frenchie Care Plan in 60 Seconds | FrenchyFab Care Compass',
       quiz: 'Frenchie care quiz | FrenchyFab Care Compass',
       loading: 'Building your Frenchie care plan | FrenchyFab',
-      emailGate: 'Save your Frenchie care plan | FrenchyFab',
       results: 'Your Frenchie care plan | FrenchyFab',
       upsell: 'Frenchie Care Vault | FrenchyFab',
     };
@@ -77,8 +73,8 @@ const Index = () => {
   // Persist key state
   useEffect(() => {
     if (!hydrated) return;
-    saveProfile({ answers, email, plan, step, screen });
-  }, [answers, email, plan, step, screen, hydrated]);
+    saveProfile({ answers, plan, step, screen });
+  }, [answers, plan, step, screen, hydrated]);
 
   const currentStep = quizSteps[step];
 
@@ -104,7 +100,9 @@ const Index = () => {
       const finalPlan = generatePlan(answers);
       setPlan(finalPlan);
       saveProfile({ plan: finalPlan, completedAt: new Date().toISOString() });
-      setScreen('emailGate');
+      // No email gate: the free result shows straight away. Email sign-up is optional on the results screen.
+      setScreen('results');
+      trackRevenueEvent('free_result_viewed');
     }
   };
 
@@ -113,41 +111,11 @@ const Index = () => {
     else setScreen('landing');
   };
 
-  const handleEmailSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isValidEmail(email)) {
-      toast({ title: 'Enter a valid email', description: 'We need a real address to save the plan.', variant: 'destructive' });
-      return;
-    }
-    const normalizedEmail = normalizeEmail(email);
-
-    localStorage.setItem('frenchie_email', normalizedEmail);
-    saveProfile({ email: normalizedEmail, leadCaptured: true });
-
-    try {
-      await submitLead({ email: normalizedEmail, answers, plan, source: 'frenchie-care-plan-app' });
-      toast({
-        title: 'Your free plan is saved',
-        description: 'We saved your Frenchie profile and unlocked your personalized care plan.',
-      });
-    } catch {
-      toast({
-        title: 'Saved in this browser',
-        description: 'The care plan is on this device. Lead sync will retry when the server accepts it.',
-        variant: 'destructive',
-      });
-    }
-
-    setScreen('results');
-    trackRevenueEvent('free_result_viewed');
-  };
-
   const handleStartOver = () => {
     clearProfile();
     setScreen('landing');
     setStep(0);
     setAnswers(defaultAnswers);
-    setEmail('');
     setPlan([]);
   };
 
@@ -180,10 +148,6 @@ const Index = () => {
           )}
 
           {screen === 'loading' && <LoadingScreen />}
-
-          {screen === 'emailGate' && (
-            <EmailGate plan={plan} email={email} setEmail={setEmail} onSubmit={handleEmailSubmit} />
-          )}
 
           {screen === 'results' && (
             <ResultsScreen

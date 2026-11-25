@@ -8,6 +8,8 @@ import { isValidEmail, normalizeEmail } from '@/lib/quizValidation';
 import FeatureComparison from './FeatureComparison';
 import SocialProof from './SocialProof';
 import { publicFocusTitle } from '@/lib/publicFocus';
+import { loadProfile } from '@/lib/profileStore';
+import { EMERGENCY_CARD_PRICE_USD, VAULT_PLUS_CARD_PRICE_USD, VAULT_PRICE_USD } from '@/lib/stripeConfig';
 
 type Props = {
   onSkip: () => void;
@@ -38,16 +40,15 @@ const PremiumUpsell = ({ onSkip, answers }: Props) => {
   const handleCheckout = async () => {
     setLoading(true);
     try {
-      const email = localStorage.getItem('frenchie_email') || '';
+      // Prefill only an email the visitor chose to give us. Stripe asks for one at checkout anyway.
+      const email = loadProfile().email || '';
       const checkout = await createCheckout({ email, addBump, answers });
       if (checkout.mode === 'payment-link') {
         trackNotice();
       }
       window.location.href = checkout.url;
-    } catch (err) {
-      console.error('Checkout error:', err);
-      alert('Checkout could not be opened. No purchase has been confirmed.');
-    } finally {
+    } catch {
+      setRecoveryMessage('Checkout could not be opened. Nothing was charged. Please try again.');
       setLoading(false);
     }
   };
@@ -64,7 +65,7 @@ const PremiumUpsell = ({ onSkip, answers }: Props) => {
     }
     try {
       await requestPurchaseRecovery(normalizeEmail(recoveryEmail));
-      setRecoveryMessage('If that email has a confirmed purchase, we sent an access link.');
+      setRecoveryMessage('If that email has a paid Care Vault purchase, we just emailed a link that reopens it.');
     } catch {
       setRecoveryMessage('Recovery email is unavailable until the payment server is configured. Keep your Stripe receipt.');
     }
@@ -206,7 +207,7 @@ const PremiumUpsell = ({ onSkip, answers }: Props) => {
             </div>
             <div>
               <p className="text-sm font-black text-foreground">
-                ADD: One-page emergency fridge card — <span className="text-red-600">+$4.99</span>
+                ADD: One-page emergency fridge card — <span className="text-red-600">+${EMERGENCY_CARD_PRICE_USD}</span>
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 The vault already includes the emergency checklist. This add-on is a separate large-type page meant for the fridge. It does not include medication doses.
@@ -244,7 +245,7 @@ const PremiumUpsell = ({ onSkip, answers }: Props) => {
             ) : (
               <Download className="w-4 h-4 shrink-0" />
             )}
-            <span className="truncate">{loading ? 'Opening checkout...' : `Unlock My Frenchie Care Vault — $${addBump ? '12.98' : '7.99'}`}</span>
+            <span className="truncate">{loading ? 'Opening Stripe checkout...' : `Get the full Care Vault — $${addBump ? VAULT_PLUS_CARD_PRICE_USD : VAULT_PRICE_USD}`}</span>
           </Button>
           <div className="flex items-center justify-center gap-2 mt-3 py-2 px-4 rounded-lg bg-emerald-50 border border-emerald-200/50">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
@@ -253,24 +254,25 @@ const PremiumUpsell = ({ onSkip, answers }: Props) => {
             </p>
           </div>
           <p className="text-center text-xs text-muted-foreground mt-2">
-            One-time payment. The vault opens after Stripe confirms it. No subscription.
+            One-time payment in USD on Stripe. No subscription. The Vault unlocks after Stripe confirms the payment.
           </p>
           {recoveryMessage && (
             <p className="text-center text-xs text-muted-foreground mt-2">{recoveryMessage}</p>
           )}
         </motion.div>
 
-        <form onSubmit={sendRecovery} className="flex gap-2">
+        <p id="restore-heading" className="text-xs font-bold text-foreground pt-2">Restore purchase</p>
+        <form onSubmit={sendRecovery} aria-labelledby="restore-heading" className="flex gap-2">
           <input
             type="email"
             aria-label="Email used at checkout"
             value={recoveryEmail}
             onChange={(event) => setRecoveryEmail(event.target.value)}
-            placeholder="Already paid? Checkout email"
+            placeholder="Email used at checkout"
             className="flex-1 h-11 rounded-xl border border-border bg-background px-3 text-sm"
           />
           <button type="submit" className="text-sm font-bold text-primary px-2">
-            Resend link
+            Restore
           </button>
         </form>
         <button
