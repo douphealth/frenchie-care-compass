@@ -393,6 +393,9 @@ describe('worker: static site & security headers', () => {
     expect(res.headers.get('x-robots-tag')).toBe('noindex');
     expect(res.headers.get('x-frame-options')).toBe('DENY');
     expect(res.headers.get('content-security-policy')).toContain("default-src 'self'");
+    // Cloudflare Web Analytics is injected at the edge; without these the beacon logs a CSP error on every page.
+    expect(res.headers.get('content-security-policy')).toContain("script-src 'self' https://static.cloudflareinsights.com");
+    expect(res.headers.get('content-security-policy')).toContain('https://cloudflareinsights.com');
     expect(res.headers.get('strict-transport-security')).toContain('max-age=31536000');
   });
 });
