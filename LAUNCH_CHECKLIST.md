@@ -19,16 +19,17 @@ Routes stay `care-plan.frenchyfab.com`, `care-plan.frenchyfab.com/`, and `care-p
 - `CAREPLAN_KV` is bound.
 - `INVOICE_CREATION` is on, so Checkout Sessions created after the worker that contains this flag is deployed will also create an invoice. Payment Links already do.
 
-## Stripe product wording (owner, Stripe dashboard)
+## Stripe product wording (done 2026-11-25)
 
-The vault Payment Link `https://buy.stripe.com/dRm14ncpW1qw3oh9f0ejK09` already charges $7.99 USD, one-time, in live mode (checked on its checkout page 2026-11-25). Its product is still named "Premium Frenchie Care Guide PDF" and the description says "12-page". The site sells it as "Frenchie Care Vault". Edit the product of price `price_1TFD07GCqwm95OGXc26k5JkI` (do not create a new price; the code and JSON-LD use this one):
+Stripe account `acct_1M7z1GGCqwm95OGX` (business name "Alexios Papaioannou"), product `prod_UDeIYaTLqAEC29`, price `price_1TFD07GCqwm95OGXc26k5JkI`:
 
-- Name: `Frenchie Care Vault`
-- Description: `Personalized French Bulldog care vault: a 4-week program for your main concern, daily routine and feeding chart, grooming, seasonal and vet-visit checklists, and an emergency red-flag guide, as a printable PDF. General education, not veterinary advice.`
-- Price stays $7.99 USD, one-time.
-- On both Payment Links, After payment → "Don't show confirmation page" → redirect to `https://care-plan.frenchyfab.com/payment-success?session_id={CHECKOUT_SESSION_ID}` (set on 2026-11-10; confirm it is unchanged).
+- Name: `Frenchie Care Vault` (was "Premium Frenchie Care Guide PDF").
+- Description: `Personalized French Bulldog care vault: a 4-week program for your main concern, daily routine and feeding chart, grooming, seasonal and vet-visit checklists, and an emergency red-flag guide, as a printable PDF. General education, not veterinary advice.` (The old "12-page" description is gone.)
+- Price unchanged: $7.99 USD, one-time. No new price was created; the code and JSON-LD use this one.
+- Payment Links `plink_1UD6mZGCqwm95OGXsj41UCMi` (`buy.stripe.com/dRm14ncpW1qw3oh9f0ejK09`, $7.99) and `plink_1UD6pCGCqwm95OGXX5yjUmYV` (`buy.stripe.com/8x25kD4Xu6KQ5wp2QCejK0a`, $12.98 with the $4.99 checklist): confirmation page `https://care-plan.frenchyfab.com/payment-success?session_id={CHECKOUT_SESSION_ID}`, post-payment invoice on.
+- Checked on both live checkout pages after the change: they show "Frenchie Care Vault".
 
-If the price ever changes, change `VAULT_PRICE_USD` in `src/lib/stripeConfig.ts` and the JSON-LD offer in `index.html` together. `src/test/vaultOffer.test.tsx` fails when they differ.
+If the name or price ever changes, keep `VAULT_PRODUCT_NAME` and `VAULT_PRICE_USD` in `src/lib/stripeConfig.ts` and the JSON-LD in `index.html` in step. `src/test/vaultOffer.test.tsx` fails when they differ.
 
 ## Remaining owner steps
 

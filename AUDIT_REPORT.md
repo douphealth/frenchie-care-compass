@@ -69,7 +69,7 @@ Severity is the production impact before this branch. Status is this branch.
 | Low | Performance | Landing Lighthouse performance is 79 on the local preview (accessibility, SEO, and best-practices are 100). | `/tmp/lh2.json` against `http://127.0.0.1:4173/` with Playwright Chromium, 2026-11-22. | Won't fix in this pass. The score is the font and script cost of the existing landing, not a broken flow. |
 | Low | Supply chain | `npm audit` after `npm audit fix` still reports 19 issues (2 critical, 2 high) that only go away by jumping to React Router 7, Zod 4, or Vitest 5. | `npm audit` on 2026-11-22. Vitest's critical advisory is the Vitest UI dev server, which this app does not run in production. | Won't fix by force-upgrading majors. Non-breaking fixes were applied. |
 | Low | Lint | `button.tsx` and `sonner.tsx` warn about fast refresh because they export helpers. | `npm run lint` exit 0, 2 warnings, both pre-existing shadcn files. | Won't fix. No errors. |
-| Info | Product | Stripe Payment Link business name is "MyFrenchyBulldog" and the product is "Premium Frenchie Care Guide PDF", not "Frenchie Care Vault". | Headless open of `https://buy.stripe.com/dRm14ncpW1qw3oh9f0ejK09?prefilled_email=audit-bot@example.com`. No card was entered. Screenshot `audit/desktop-checkout.png`. | Needs owner action in the Stripe Dashboard. |
+| Info | Product | Stripe Payment Link business name is "MyFrenchyBulldog" and the product is "Premium Frenchie Care Guide PDF", not "Frenchie Care Vault". | Headless open of `https://buy.stripe.com/dRm14ncpW1qw3oh9f0ejK09?prefilled_email=audit-bot@example.com`. No card was entered. Screenshot `audit/desktop-checkout.png`. | Fixed 2026-11-25: product renamed to "Frenchie Care Vault" with a new description; see LAUNCH_CHECKLIST "Stripe product wording". |
 
 ## (c) Free-flow checklist
 
@@ -119,7 +119,7 @@ Browser walk of the **local production build** (`vite preview` on 127.0.0.1:4173
 
 1. Deploy the worker with `CHECKOUT_VIA_LINKS=0` and a Stripe key that can write Checkout Sessions, then confirm `create-payment` returns a `checkout.stripe.com` URL.
 2. Add the webhook endpoint and `STRIPE_WEBHOOK_SECRET`, and bind `CAREPLAN_KV`, so access email, accounts, and refund revocation persist.
-3. Set `BREVO_API_KEY` and enable the Stripe Customer portal. Rename the live product from "Premium Frenchie Care Guide PDF" / "MyFrenchyBulldog" to Frenchie Care Vault / FrenchyFab.
+3. Set `BREVO_API_KEY` and enable the Stripe Customer portal. Product rename to "Frenchie Care Vault": done 2026-11-25. The checkout business name is still the Stripe account's public name.
 4. Ship the Pages build from this branch so the sitemap, account page, and server-fetched vault UI replace `worker-2026-11-10`.
 5. If the remaining PDF chart text must not be in the public bundle, move those page strings behind `vault-content` as well. That is the only paid copy still compiled into client JavaScript.
 
