@@ -156,8 +156,26 @@ export function paymentLinkUrl(addBump: boolean, email: string): string {
   return `${base}?prefilled_email=${encodeURIComponent(normalizeEmail(email))}`;
 }
 
+/** "payment-links" or "checkout-sessions" from the worker's health route; null when it cannot be read. */
+export async function workerCheckoutMode(): Promise<string | null> {
+  try {
+    const response = await withTimeout(fetch(`${LEAD_ENDPOINT}/health`, { cache: 'no-store' }), 3000);
+    const data = await response.json().catch(() => null);
+    return response.ok && data && typeof data.checkoutMode === 'string' ? data.checkoutMode : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function createCheckout(payload: CheckoutPayload): Promise<CheckoutResult> {
   trackRevenueEvent('premium_cta_clicked', { add_bump: payload.addBump });
+
+  // While the worker runs on Payment Links, create-payment answers 503 by design. Skip that call
+  // so a normal click does not log a failed request in the console.
+  if (await workerCheckoutMode() === 'payment-links') {
+    trackRevenueEvent('checkout_payment_link', { add_bump: payload.addBump });
+    return { url: paymentLinkUrl(payload.addBump, payload.email), mode: 'payment-link' };
+  }
 
   try {
     const data = await callFunction<{ url?: unknown }>('create-payment', payload as unknown as Record<string, unknown>);
